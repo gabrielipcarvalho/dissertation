@@ -5,21 +5,21 @@ const {
 	collectAndLogNews,
 	extractKeyInformation,
 	executeSentimentAnalysis,
-} = require("./GPTA_Adaptor");
+} = require("./gpta_adaptor");
 const {
 	readAndValidateData,
 	readStockPriceData: readBStockPriceData,
 	analyzeImpactOnStockPrices,
 	predictStockPrices,
-} = require("./GPTB_Adaptor");
+} = require("./gptb_adaptor");
 const {
 	readStockPriceData: readCStockPriceData,
 	analyzeStockPricesWithGPT,
-} = require("./GPTC_Adaptor");
+} = require("./gptc_adaptor");
 const {
 	integrateAndAnalyzePredictions,
 	makeFinalPrediction,
-} = require("./GPTD_Adaptor");
+} = require("./gptd_adaptor");
 const fs = require("fs").promises;
 require("dotenv").config();
 
