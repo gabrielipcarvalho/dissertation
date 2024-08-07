@@ -1,0 +1,84 @@
+// File: GPTA_Adaptor.js
+
+// Import necessary libraries
+const { Configuration, OpenAIApi } = require("openai");
+const fs = require("fs");
+require('dotenv').config();
+
+// Configuration
+const configuration = new Configuration({
+    apiKey: process.env.OPENAI_API_KEY, // Ensure you set this in your environment variables
+});
+const openai = new OpenAIApi(configuration);
+
+// Utility function to log data to a file
+const logToFile = (filename, data) => {
+    fs.writeFileSync(filename, JSON.stringify(data, null, 2), { flag: 'a' });
+}
+
+// Function to collect and log news data from a file
+const collectAndLogNews = async (day) => {
+    // Assuming the file is in the current directory and named 'news-data-dayX.json'
+    const filePath = `news-data-${day}.json`;
+
+    try {
+        // Read the news data file asynchronously
+        const newsDataJson = await fs.promises.readFile(filePath, { encoding: 'utf8' });
+        const newsData = JSON.parse(newsDataJson);
+
+        // Log the collected news data
+        logToFile(`log.news.${day}.json`, newsData);
+
+        return newsData;
+    } catch (error) {
+        console.error(`Error reading news data from file for ${day}:`, error);
+        throw error; // Rethrow to handle it in the calling context
+    }
+};
+
+// Function to extract key information from news using GPT-3
+const extractKeyInformation = async (newsData, day) => {
+    const response = await openai.createCompletion({
+        model: "text-davinci-003", // or the latest available model
+        prompt: `Please meticulously analyze the following compilation of news articles for any information that directly influences stock market trends, including but not limited to corporate earnings reports, major economic announcements, geopolitical events, and sector-specific developments. For each relevant piece of news, summarize the core information that could impact investor sentiment or market dynamics. Focus on extracting actionable insights such as significant financial updates, mergers and acquisitions, regulatory changes, or market-moving statements from influential figures. Ensure that the summaries are concise, prioritizing facts over speculative interpretations, and clearly differentiate between distinct news items. Highlight any known market reactions or potential future implications tied to these events. Your analysis should serve as an informed basis for stock market trend prediction. The news: ${JSON.stringify(newsData)}`,
+        temperature: 0.5,
+        max_tokens: 1024,
+        top_p: 1.0,
+        frequency_penalty: 0.0,
+        presence_penalty: 0.0,
+    });
+
+    const extractedInformation = response.data.choices[0].text.trim();
+    logToFile(`log.GPTA.${day}.news.json`, { extractedInformation });
+    return extractedInformation;
+};
+
+// Function to execute sentiment analysis on extracted news
+const executeSentimentAnalysis = async (extractedInformation, day) => {
+    const response = await openai.createCompletion({
+        model: "text-davinci-003", // or the latest available model
+        prompt: `Based on the key information extracted from the news articles, which is summarized below:\n\n"${extractedInformation}"\n\nPlease conduct a detailed sentiment analysis. Break down your analysis into the following components:\n1. Overall Sentiment: Determine if the overall sentiment conveyed by the information is positive, negative, or neutral towards the stock market trends. Please provide a brief explanation for your assessment.\n2. Impact Factors: Identify specific elements or themes within the information that contribute to the overall sentiment. For example, mention if corporate earnings reports, economic indicators, geopolitical events, or regulatory changes are driving the sentiment.\n3. Sentiment Intensity: Evaluate the intensity of the sentiment expressed. Is the sentiment strongly positive, mildly positive, neutral, mildly negative, or strongly negative? Provide reasoning for your evaluation.\n4. Potential Market Impact: Based on the sentiment and the specific factors identified, speculate on the potential impact this news could have on the stock market. Consider aspects such as investor confidence, market volatility, or specific sectors that might be affected.\n5. Uncertainties or Ambiguities: Highlight any uncertainties or ambiguous information in the extracted key news that could affect the clarity of the sentiment analysis. Explain how these uncertainties might influence the sentiment or its perception by investors.\n\nYour analysis will help in understanding the nuanced sentiment embedded in the news information and its potential implications for stock market trends.`,
+        temperature: 0.5,
+        max_tokens: 1024,
+        top_p: 1.0,
+        frequency_penalty: 0.0,
+        presence_penalty: 0.0,
+    });
+
+    const sentimentAnalysis = response.data.choices[0].text.trim();
+    logToFile(`log.GPTA.${day}.sentiment.json`, { sentimentAnalysis });
+    return sentimentAnalysis;
+};
+
+// Example Usage
+(async () => {
+    try {
+        const day = 'day0'; // Example day
+        const newsData = await collectAndLogNews(day);
+        const extractedInformation = await extractKeyInformation(newsData, day);
+        const sentimentAnalysis = await executeSentimentAnalysis(extractedInformation, day);
+        console.log(`Sentiment Analysis for ${day}:`, sentimentAnalysis);
+    } catch (error) {
+        console.error("Error in GPTA Adaptor:", error);
+    }
+})();

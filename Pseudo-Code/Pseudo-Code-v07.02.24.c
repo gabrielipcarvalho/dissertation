@@ -1,0 +1,876 @@
+// Pseudo-Code-v07.02.24.txt
+// Gabriel_IPC (Oakencroft) 07/02/2024 (last update)
+// This system fine-tunes a pre-trained GPT model to predict stock market trends using news, news' sentiment and historical data. It aims to assess and enhance the model's predictive accuracy through continuous learning and iterative refinements based on daily data analysis and sentiment assessment.
+
+#define DATA
+#define EVALUATIONS
+#define PREDICTIONS
+#define VERIFICATION
+#define FINE_TUNING
+#define CORRECTIONS
+
+//BEGINNING OF PESEUDO-CODE:
+DAY.0 { 
+	DATA {
+		COLLECT(stock price fluctuation of day0) 
+			log.prices.day0
+		COLLECT(news of day0)
+        	log.news.day0
+	}
+}
+DAY.1 {
+	DATA {
+	    COLLECT(stock-price fluctuation of day1) 
+            log.prices.day1
+	    COLLECT(news of day1) 
+            log.news.day1
+	}
+    EVALUATIONS {
+        ((GPTA)) {
+            EXTRACT(key information from:) {
+               	day0 News {
+					INPUT {
+						log.news.day0
+					}
+					PROCESS {
+						perform the extraction of relevant news.
+					}
+					OUTPUT {
+						log.GPTA.day0.news
+					}
+				} 
+                day1 News {
+					INPUT {
+						log.news.day1
+					}
+					PROCESS {
+						"perform the extraction of relevant news."
+					}
+					OUTPUT {
+						log.GPTA.day1.news
+					}
+				}
+			}
+			EXECUTE(Sentiment Analisys on:) {
+				day0 News {
+					INPUT {
+						log.news.day0, 
+						log.GPTA.day0.news
+					} 
+					PROCESS {
+						"perform Sentiment Analysis on log.news.day0, then on log.GPTA.day0.news, then cross both"
+							(log.news.day0 + log.GPTA.day0.news) 
+						//analysis of overall.news then cross analysis with the extracted.key.news
+					}
+					OUTPUT {
+						log.GPTA.day0.sentiment
+					}
+				}
+				day1 News {
+					INPUT {
+						log.news.day1,
+						log.GPTA.day1.news
+					}
+					PROCESS {
+						"perform Sentiment Analysis on log.news.day1, then on log.GPTA.day1.news, then cross both"
+							(log.news.day1 + log.GPTA.day1.news)
+					}			
+					OUTPUT {
+						log.GPTA.day1.sentiment
+					}
+				}
+			}
+		}
+    	((GPTB)) {
+            ANALYSE(how (day0.news) affected the fluctuation of stock-prices for day0) {
+				INPUT {
+					log.GPTA.day0.news,
+					log.GPTA.day0.sentiment,
+					log.prices.day0
+				}
+				PROCESS { 
+					Correlate day0 news+sentiment with day0 stock-price movements to identify patterns and causative links
+						((log.GPTA.day0.news + log.GPTA.day0.sentiment) x log.prices.day0)
+				}
+				OUTPUT {
+					log.GPTB.day0
+				}
+			}
+            ANALYSE(how (day1.news + day0.news) affected the fluctuation of stock-prices for day1) {
+				INPUT {
+					log.prices.day1,
+					log.GPTA.day1.news,
+					log.GPTA.day0.news,
+					log.GPTA.day1.sentiment
+					log.GPTA.day0.sentiment,
+
+				}
+				PROCESS {
+					"Correlate day1 AND day0 news+sentiment with day1 stock-price movements to identify patterns and causative links" {
+						((log.GPTA.day1.news + log.GPTA.day1.sentiment) x log.prices.day1)
+						+
+						((log.GPTA.day0.news + log.GPTA.day0.sentiment) x log.prices.day1)
+					}
+				}
+				OUTPUT { 
+					log.GPTB.day1
+				}
+			//cumulative analyses of news (dayN+...+day1+day0) -> work with N-7 news cumulativelly (1-week-news)
+			}
+		}	
+        ((GPTC)) {
+            ANALYSE(Look for patterns and trends on day0 stock-prices) {
+				INPUT {
+					log.prices.day0
+				}
+				PROCESS {
+					"Evaluate historical and intraday price fluctuations of Day 0 to identify significant patterns and emerging trends"
+				}
+				OUTPUT {
+					log.GPTC.day0
+				}
+			}
+            ANALYSE(Look for patterns and trends on (log.prices.day0 + log.prices.day1)) {
+				INPUT {
+					log.prices.day0,
+					log.prices.day1
+				}
+				PROCESS {
+					"Combine and analyze Day 0 and Day 1 stock price data to discern evolving trends and inter-day price dynamics"
+				}
+				OUTPUT {
+					log.GPTC.day1
+				}
+			}
+			//cumulative analyses of stock-prices - ∑ day0 to dayN
+		}
+	}
+	PREDICTIONS {
+		((GPTB)) {
+    		PREDICT(stock-prices for day2 based on log.GPTB.day1) {
+				INPUT {
+					log.GPTB.day1
+				}
+				PROCESS {
+					"Utilize the analysis of news impact from Day 1 to forecast stock prices for Day 2, incorporating identified market sentiment influences"
+				}
+				OUTPUT {
+					log.GPTB.Prediction.day2
+				}
+			}
+		}
+		((GPTC)) {
+			PREDICT(stock-prices for day2 based on log.GPTC.day1) {	
+				INPUT {
+					log.GPTC.day1
+				}
+				PROCESS {
+					"Apply trend analysis from stock price movements to predict Day 2 prices, focusing on identified patterns and historical data correlations"
+				}
+				OUTPUT {
+					log.GPTC.prediction.day2
+				}
+			}
+		}
+		((GPTD)) {
+			ANALYSE(log.GPTB.prediction.day2 + log.GPTC.prediction.day2) {
+				INPUT {
+					log.GPTB.prediction.day2,
+					log.GPTC.prediction.day2
+				}
+				PROCESS {
+					"Integrate and analyze predictions from GPTB and GPTC for Day 2, assessing the alignment and discrepancies between the two forecasts."
+				}
+				OUTPUT {
+					log.GPTD.day1
+				}
+			}
+            PREDICT(make a final prediction for day-2 stock-prices based on log.GPTD.day1) {
+				INPUT {
+					log.GPTD.day1
+				}
+				PROCESS {
+					"Synthesize insights from the combined analysis to make a final, comprehensive prediction for Day 2 stock prices, leveraging the strengths of both GPTB and GPTC models"
+				}
+				OUTPUT {
+					log.GPTD.prediction.day2
+				}
+			}
+		}
+	}
+}
+DAY.2 {
+	DATA {
+	    COLLECT(stock-price fluctuation of day2)
+            log.prices.day2
+	    COLLECT(news of day2)
+            log.news.day2
+	}
+	VERIFICATION {
+		((GPTB)) {
+			COMPARE(log.prices.day2 x log.GPTB.prediction.day2) {
+				INPUT {
+					log.prices.day2,
+					log.GPTB.prediction.day2
+				}
+				PROCESS {
+					"Evaluate the accuracy of GPTB's predictions by comparing them against actual Day 2 stock prices, considering a predefined margin of error"
+						(log.prices.day2 x log.GPTB.prediction.day2)
+				}
+				OUTPUT {
+					if (prediction == false AND outside margin) { //have to set a margin 
+						"Log details of predictions and errors for day-2-prices (magnitude, context)"
+							log.GPTB.error.day2
+					}
+					else {
+						log.GPTB.success.day2
+							"Include/produce meta-insights of what montly inclined the module into the right prediction"
+					}
+				}
+			}
+		}
+		((GPTC)) {
+			COMPARE(log.prices.day2 x log.GPTC.prediction.day2) {
+				INPUT {
+					log.prices.day2,
+					log.GPTC.prediction.day2
+				}
+				PROCESS {
+					"Assess the performance of GPTC's predictions by comparing them with actual stock market data for Day 2 to determine the model's forecasting accuracy within an established error threshold."
+				}
+				OUTPUT {
+					if (prediction == false AND outside margin) {
+						"Log details of predictions and errors for day-2 prices (magnitude, context)"
+							log.GPTC.error.day2
+					}
+					else {
+						log.GPTC.success.day2
+							"include/produce meta-insights of what montly inclined the module into the right prediction"
+					}
+				}
+			}
+		}		
+		((GPTD)) {
+			COMPARE(log.prices.day2 x log.GPTD.prediction.day2) {
+				INPUT {
+					log.prices.day2,
+					log.GPTD.prediction.day2
+				}
+				PROCESS {
+					"Conduct a thorough evaluation of GPTD's prediction accuracy by comparing the predicted stock prices for Day 2 against the actual market values, keep adherence to pre-set accuracy margins"
+						log.prices.day2 x log.GPTD.prediction.day2
+				}
+				OUTPUT {
+					if (prediction == false AND outside margin) {
+						"Log details of predictions and errors for day-2 prices (magnitude, context)"
+							log.GPTD.error.day2
+					}
+					else {
+						log.GPTC.success.day2
+							"include/produce meta-insights of what montly inclined the module into the right prediction"
+					}
+				}
+			}
+			COMPARE(log.GPTB.prediction.day2 x log.GPTC.prediction.day2) {
+				INPUT {
+					log.GPTB.prediction.day2,
+					log.GPTC.prediction.day2,
+					log.prices.day2
+				}
+				PROCESS {
+					"Evaluate which model, either GPTB or GPTC got closer to the right answer"
+						log.GPTB.prediction.day2 x log.prices.day2
+						x
+						log.GPTB.prediction.day2 x log.prices.day2
+				}
+				OUTPUT {
+					log.GPTD.comparison.day2
+				}
+			}
+		}				
+		((GPTE)) {
+			COMPARE(Sentiment Analysis of GPTA vs GPTBs results:) {
+			//this model will evaluate the news' Sentiment Analysis of GPTA with GPTB results.
+				INPUT {
+					log.GPTA.day0.sentiment,
+					log.GPTA.day1.sentiment,
+					log.GPTB.error.day2 or log.GPTB.seccess.day2
+				}
+				PROCESS {
+					"Assess and compare the accuracy of GPTA's sentiment analysis against GPTB's stock price prediction outcomes to identify the effectiveness of sentiment insights on market predictions"
+				}
+				OUTPUT {
+					log.GPTE.sentiment-review.day2
+				}
+			}
+		}
+	}
+	FINE_TUNING-PART-ONE {
+		((GPTA)) {
+			FINE_TUNE(feed:) {
+				log.GPTE.sentiment-review.day2
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 7 days of log.GPTE.sentiment-review.dayN
+		}
+	}
+	CORRECTIONS {
+		((GPTA)) {
+			CORRECT(Sentiment Analysis of day0 and day1) {
+				INPUT {
+					log.GPTE.sentiment-review.day2,
+					log.GPTA.day0.sentiment,
+					log.GPTA.day1.sentiment,
+				}
+				PROCESS {
+					"Adjust sentiment analysis outcomes based on a review of GPTA's previous outputs, latest sentiment review results and fine-tuning process."
+				}
+				OUTPUT {
+					log.GPTA.day0.sentiment.review0
+					log.GPTA.day1.sentiment.review0
+				}
+			}
+		}
+	}
+	FINE_TUNING-PART-TWO {	
+		((GPTB)) {
+			FINE_TUNE(feed:) {
+				log.GPTB.error.day2 or log.GPTB.success.day2,
+				log.GPTA.day0.news, 
+				log.GPTA.day1.news,
+				log.GPTA.day0.sentiment.review0,
+				log.GPTA.day1.sentiment.review0,
+				log.prices.day0, 
+				log.prices.day1,
+				log.prices.day2,
+				log.GPTB.day0, 
+				log.GPTB.day1
+				log.GPTB.prediction.day2
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 5 days of log.GPTB.error or log.GPTB.success.
+				// Last 5 days of log.GPTA.dayN.news.
+				// Last 10 days of log.prices.dayN.
+				// Last 5 days of log.GPTB.dayN.
+				// Last 5 days of log.GPTB.prediction.dayN
+		}
+		((GPTC)) {
+			FINE_TUNE(feed:) {
+				log.GPTC.error.day2 or log.GPTC.success.day2,
+				log.prices.day0,
+				log.prices.day1,
+				log.prices.day2,
+				log.GPTC.day0,
+				log.GPTC.day1,
+				log.GPTC.prediction.day2,
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 5 days of log.GPTC.error.dayN or log.GPTC.success.dayN
+				// Last 20 days of log.prices.dayN
+				// Last 5 days of log.GPTC.dayN
+				// Last 5 days of log.GPTC.prediction.dayN
+		}
+		((GPTD)) {
+			FINE_TUNE(feed:) {
+				log.GPTD.error.day2 or log.GPTD.success.day2,
+				log.GPTC.error.day2 or log.GPTC.success.day2,
+				log.GPTB.error.day2 or log.GPTB.success.day2,
+				log.GPTD.comparison.day2,
+				log.GPTC.prediction.day2,				
+				log.GPTB.prediction.day2,
+				log.prices.day2,
+				log.prices.day1,
+				log.prices.day0
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 5 days of log.GPTD.error.dayN or log.GPTD.success.dayN
+				// Last 5 days of log.GPTC.error.dayN or log.GPTC.success.dayN
+				// Last 5 days of log.GPTB.error.dayN or log.GPTB.success.dayN
+				// Last 5 days of log.GPTD.comparison.dayN
+				// Last 5 days of log.GPTC.prediction.dayN
+				// Last 5 days of log.GPTB.prediction.dayN
+				// Last 15 days of log.prices.dayN
+		}
+	}
+	EVALUATIONS {
+        ((GPTA)) {
+			EXTRACT(key information from day2 news) {
+				INPUT {
+					log.news.day2
+				}
+				PROCESS { 
+					"Perform the extraction of relevant news"
+				}
+				OUTPUT {
+					log.GPTA.day2.news
+				}
+			}
+			EXECUTE(Sentiment Analysis on day2 news) {
+				INPUT {
+					log.news.day2,
+					log.GPTA.day2.news
+				}
+				PERFORM {
+					"Perform Sentiment Analysis on log.news.day2 and log.GPTA.day2.news, then cross-analyze both."
+				}
+				OUTPUT {
+					log.GPTA.day2.sentiment
+				}
+		}
+		}
+		((GPTB)) {
+			ANALYSE(how (day2.news + day1.news + day0.news) affected the fluctuation of stock-prices for day2) { 
+			// set priority scheme -> higher focus on day2.news, then day1.news ...
+				INPUT {
+					log.prices.day2,
+					log.GPTA.day2.news,
+					log.GPTA.day1.news,
+					log.GPTA.day0.news,
+					log.GPTA.day2.sentiment
+					log.GPTA.day1.sentiment.review0
+					log.GPTA.day0.sentiment.review0
+				}
+				PROCESS {
+					"Correlate day2 AND day1 AND day0 news+sentiment with day2 stock-price movements to identify patterns and causative links"
+						((log.GPTA.day2.news + log.GPTA.day2.sentiment) x log.prices.day2)
+						+
+						((log.GPTA.day1.news + log.GPTA.day1.sentiment.review0) x log.prices.day2)
+						+
+						((log.GPTA.day0.news + log.GPTA.day0.sentiment.review0) x log.prices.day2)
+				}
+				OUTPUT {
+					log.GPTB.day2
+				}
+			//cumulative analyses of news (dayN+...+day1+day0) -> work with N-7 news cumulativelly (1-week-news)
+			} 
+			
+		}
+        ((GPTC)) {
+			ANALYSE(Look for patterns and trends on (log.prices.day2 + log.prices.day1 + log.prices.day0)){
+				INPUT {
+					log.prices.day2,
+					log.prices.day1,
+					log.prices.day0,
+				}
+				PROCESS {
+					"Combine and analyze Day 2, Day1 and Day 0 stock price data to discern evolving trends and inter-day price dynamics"
+				}
+				OUTPUT {
+					log.GPTC.day2
+				}
+			}
+			// cumulative analyses of stock-prices - ∑ dayN to day0
+			// set priority scheme -> most recent fluctuations > older fluctuations
+		}
+	}
+	PREDICTIONS {
+		((GPTB)) {
+			PREDICT(stock-prices for day3 based on log.GPTB.day2) {
+				INPUT {
+					log.GPTB.day2
+				}
+				PROCESS {
+					"Utilize the analysis of news impact from Day 2 to forecast stock prices for Day 3, incorporating identified market sentiment influences"
+				}
+				OUTPUT {
+					log.GPTB.prediction.day3
+				}
+			}
+		}
+		((GPTC)) {
+			PREDICT(stock-prices for day2 based on log.GPTC.day2) {
+				INPUT {
+					log.GPTC.day2
+				}
+				PROCESS {
+					"Apply trend analysis from stock price movements to predict Day 3 prices, focusing on identified patterns and historical data correlations"
+				}
+				OUTPUT {
+					log.GPTC.prediction.day3
+				}
+			}
+		}  
+		((GPTD)) {
+			ANALYSE(log.GPTB.prediction.day3 + log.GPTC.prediction.day3) {
+				INPUT {
+					log.GPTB.prediction.day3,
+					log.GPTC.prediction.day3
+				}
+				PROCESS {
+					"Integrate and analyze predictions from GPTB and GPTC for Day 2, assessing the alignment and discrepancies between the two forecasts."
+				}
+				OUTPUT {
+					log.GPTD.day2
+				}
+			}
+			PREDICT(make a final prediction for day3 stock-prices based on log.GPTD.day2) {
+				INPUT {
+					log.GPTD.day2
+				}
+				PROCESS {
+					"Synthesize insights from the combined analysis to make a final, comprehensive prediction for Day 3 stock prices, leveraging the strengths of both GPTB and GPTC models"
+				}
+				OUTPUT {
+					log.GPTD.prediction.day3
+				}
+
+			}
+		}
+	}
+}
+DAY.3 {
+	DATA {
+	    COLLECT(stock-price fluctuation of day3)
+            log.prices.day3
+	    COLLECT(news of day3)
+            log.news.day3
+	}
+	VERIFICATION {
+		((GPTB)) {
+			COMPARE(log.prices.day3 x log.GPTB.prediction.day3) {
+				INPUT {
+					log.prices.day3,
+					log.GPTB.prediction.day3
+				}
+				PROCESS {
+					"Evaluate the accuracy of GPTB's predictions by comparing them against actual Day 3 stock prices, considering a predefined margin of error"
+						(log.prices.day3 x log.GPTB.prediction.day3)
+				}
+				OUTPUT {
+					if (prediction == false AND outside margin) { //have to set a margin 
+						"Log details of predictions and errors for day-3-prices (magnitude, context)"
+							log.GPTB.error.day3
+					}
+					else {
+						log.GPTB.success.day3
+							"Include/produce meta-insights of what montly inclined the module into the right prediction"
+					}
+				}
+			}
+		}
+		((GPTC)) {
+			COMPARE(log.prices.day3 x log.GPTC.prediction.day3) {
+				INPUT {
+					log.prices.day3,
+					log.GPTC.prediction.day3
+				}
+				PROCESS {
+					"Assess the performance of GPTC's predictions by comparing them with actual stock market data for Day 3 to determine the model's forecasting accuracy within an established error threshold."
+				}
+				OUTPUT {
+					if (prediction == false AND outside margin) {
+						"Log details of predictions and errors for day-3 prices (magnitude, context)"
+							log.GPTC.error.day3
+					}
+					else {
+						log.GPTC.success.day3
+							"include/produce meta-insights of what montly inclined the module into the right prediction"
+					}
+				}
+			}
+		}		
+		((GPTD)) {
+			COMPARE(log.prices.day3 x log.GPTD.prediction.day3) {
+				INPUT {
+					log.prices.day3,
+					log.GPTD.prediction.day3
+				}
+				PROCESS {
+					"Conduct a thorough evaluation of GPTD's prediction accuracy by comparing the predicted stock prices for Day 3 against the actual market values, keep adherence to pre-set accuracy margins"
+						(log.prices.day3 x log.GPTD.prediction.day3)
+				}
+				OUTPUT {
+					if (prediction == false AND outside margin) {
+						"Log details of predictions and errors for day-2 prices (magnitude, context)"
+							log.GPTD.error.day3
+					}
+					else {
+						log.GPTC.success.day3
+							"include/produce meta-insights of what montly inclined the module into the right prediction"
+					}
+				}
+			}
+			COMPARE(log.GPTB.prediction.day3 x log.GPTC.prediction.day3) {
+				INPUT {
+					log.GPTB.prediction.day3,
+					log.GPTC.prediction.day3,
+					log.prices.day3
+				}
+				PROCESS {
+					"Evaluate which model, either GPTB or GPTC, got closer to the right answer"
+						log.GPTB.prediction.day3 x log.prices.day3
+						x
+						log.GPTB.prediction.day3 x log.prices.day3
+				}
+				OUTPUT {
+					log.GPTD.comparison.day3
+				}
+			}
+		}				
+		((GPTE)) {
+			COMPARE(Sentiment Analysis of GPTA vs GPTBs results:) {
+			//this model will evaluate the news' Sentiment Analysis of GPTA with GPTB results.
+				INPUT {
+					log.GPTA.day0.sentiment.review0,
+					log.GPTA.day1.sentiment.review0,
+					log.GPTA.day2.sentiment,
+					log.GPTB.error.day2 or log.GPTB.seccess.day2
+					log.GPTB.error.day3 or log.GPTB.success.day3
+				} 
+				//will feed a cumulative of 7 days of logs from GPTA and GPTB
+					//GPTA's logs shall be always the most recent reviewd log for that day.
+				PROCESS {
+					"Assess and compare the accuracy of GPTA's sentiment analysis against GPTB's stock price prediction outcomes to identify the effectiveness of sentiment insights on market predictions"
+				}
+				OUTPUT {
+					log.GPTE.sentiment-review.day3
+				}
+			}
+		}
+	}
+	FINE_TUNING-PART-ONE {
+		((GPTA)) {
+			FINE_TUNE(feed:) {
+				log.GPTE.sentiment-review.day3
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 7 days of log.GPTE.sentiment-review.dayN
+		}
+	}
+	CORRECTIONS {
+		((GPTA)) {
+			CORRECT(Sentiment Analysis of day2, day1 and day0) {
+				INPUT {
+					log.GPTE.sentiment-review.day3,
+					log.GPTA.day0.sentiment.review0,
+					log.GPTA.day1.sentiment.review0,
+					log.GPTA.day2.sentiment
+				}
+				PROCESS {
+					"Adjust sentiment analysis outcomes based on a review of GPTA's previous outputs, latest sentiment review results and fine-tuning process."
+				}
+				OUTPUT {
+					log.GPTA.day0.sentiment.review1
+					log.GPTA.day1.sentiment.review1
+					log.GPTA.day2.sentiment.review0
+				}
+			}
+		}
+	}
+	FINE_TUNING-PART-TWO {	
+		((GPTB)) {
+			FINE_TUNE(feed:) {
+				log.GPTB.error.day3 or log.GPTB.success.day3
+				log.GPTB.error.day2 or log.GPTB.success.day2,
+				log.GPTA.day2.news,
+				log.GPTA.day1.news, 
+				log.GPTA.day0.news,
+				log.GPTA.day2.sentiment.review0
+				log.GPTA.day1.sentiment.review1, //using newest review
+				log.GPTA.day0.sentiment.review1, //using newest review
+				log.prices.day3,
+				log.prices.day2, 
+				log.prices.day1,
+				log.prices.day0,
+				log.GPTB.day2,
+				log.GPTB.day1, 
+				log.GPTB.day0,
+				log.GPTB.prediction.day3,
+				log.GPTB.prediction.day2
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 5 days of log.GPTB.error or log.GPTB.success.
+				// Last 5 days of log.GPTA.dayN.news.
+				// Last 10 days of log.prices.dayN.
+				// Last 5 days of log.GPTB.dayN.
+				// Last 5 days of log.GPTB.prediction.dayN
+		}
+		((GPTC)) {
+			FINE_TUNE(feed:) {
+				log.GPTC.error.day3 or log.GPTC.success.day3,
+				log.GPTC.error.day2 or log.GPTC.success.day2,
+				log.prices.day3,
+				log.prices.day2,
+				log.prices.day1,
+				log.prices.day0,
+				log.GPTC.day2,
+				log.GPTC.day1,
+				log.GPTC.day0,
+				log.GPTC.prediction.day3,
+				log.GPTC.prediction.day2
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 5 days of log.GPTC.error.dayN or log.GPTC.success.dayN
+				// Last 20 days of log.prices.dayN
+				// Last 5 days of log.GPTC.dayN
+				// Last 5 days of log.GPTC.prediction.dayN
+		}
+		((GPTD)) {
+			FINE_TUNE(feed:) {
+				log.GPTD.error.day3 or log.GPTD.success.day3
+				log.GPTD.error.day2 or log.GPTD.success.day2,
+				log.GPTC.error.day3 or log.GPTC.success.day3
+				log.GPTC.error.day2 or log.GPTC.success.day2,
+				log.GPTB.error.day3 or log.GPTC.success.day3,
+				log.GPTB.error.day2 or log.GPTB.success.day2,
+				log.GPTD.comparison.day3,
+				log.GPTD.comparison.day2,
+				log.GPTC.prediction.day3,
+				log.GPTC.prediction.day2,				
+				log.GPTB.prediction.day3,
+				log.GPTB.prediction.day2,
+				log.prices.day3,
+				log.prices.day2,
+				log.prices.day1,
+				log.prices.day0
+			}
+			// Every cycle of fine-tuning, include:
+				// Last 5 days of log.GPTD.error.dayN or log.GPTD.success.dayN
+				// Last 5 days of log.GPTC.error.dayN or log.GPTC.success.dayN
+				// Last 5 days of log.GPTB.error.dayN or log.GPTB.success.dayN
+				// Last 5 days of log.GPTD.comparison.dayN
+				// Last 5 days of log.GPTC.prediction.dayN
+				// Last 5 days of log.GPTB.prediction.dayN
+				// Last 15 days of log.prices.dayN
+		}
+	}
+	EVALUATIONS {
+        ((GPTA)) {
+			EXTRACT(key information from day3 news) {
+				INPUT {
+					log.news.day3
+				}
+				PROCESS { 
+					"Perform the extraction of relevant news"
+				}
+				OUTPUT {
+					log.GPTA.day3.news
+				}
+			}
+			EXECUTE(Sentiment Analysis on day3 news) {
+				INPUT {
+					log.news.day3,
+					log.GPTA.day3.news
+				}
+				PERFORM {
+					"Perform Sentiment Analysis on log.news.day2 and log.GPTA.day2.news, then cross-analyze both."
+				}
+				OUTPUT {
+					log.GPTA.day3.sentiment
+				}
+			}
+		}
+		((GPTB)) {
+			ANALYSE(how (day3.news + (...) + day0.news) affected the fluctuation of stock-prices for day2) {
+			// set priority scheme -> higher focus on day3.news, then day2.news ...
+			//cumulative analyses of news (dayN+...+day1+day0) -> work with N-7 news cumulativelly (1-week-news)
+				INPUT {
+					log.prices.day3,
+					log.GPTA.day3.news,
+					log.GPTA.day2.news,
+					log.GPTA.day1.news,
+					log.GPTA.day0.news,
+					log.GPTA.day3.sentiment,
+					log.GPTA.day2.sentiment.review0, // using most recent review
+					log.GPTA.day1.sentiment.review1, // using most recent review
+					log.GPTA.day0.sentiment.review1, // using most recent review
+				}
+				PROCESS {
+					"Correlate day3~day0 news+sentiment with day3 stock-price movements to identify patterns and causative links"
+						((log.GPTA.day3.news + log.GPTA.day3.sentiment) x log.prices.day3)
+						+
+						(...)
+						+
+						((log.GPTA.day0.news + log.GPTA.day0.sentiment.review1) x log.prices.day3) // most recent reviews
+				}
+				OUTPUT {
+					log.GPTB.day3
+				}
+			} 
+		}
+        ((GPTC)) {
+			ANALYSE(Look for patterns and trends on (log.prices.day3 + (...) + log.prices.day0)) {
+				INPUT {
+					log.prices.day3,
+					(...)
+					log.prices.day0,
+				}
+				PROCESS {
+					"Combine and analyze Day 2, Day1 and Day 0 stock price data to discern evolving trends and inter-day price dynamics"
+				}
+				OUTPUT {
+					log.GPTC.day3
+				}
+			}
+			// cumulative analyses of stock-prices - ∑ dayN to day0
+			// set priority scheme -> most recent fluctuations > older fluctuations
+		}
+	}
+	PREDICTIONS {
+		((GPTB)) {
+			PREDICT(stock-prices for day4 based on log.GPTB.day3) {
+				INPUT {
+					log.GPTB.day3
+				}
+				PROCESS {
+					"Utilize the analysis of news impact from Day 2 to forecast stock prices for Day 3, incorporating identified market sentiment influences"
+				}
+				OUTPUT {
+					log.GPTB.prediction.day4
+				}
+			}
+		}
+		((GPTC)) {
+			PREDICT(stock-prices for day4 based on log.GPTC.day3) {
+				INPUT {
+					log.GPTC.day3
+				}
+				PROCESS {
+					"Apply trend analysis from stock price movements to predict Day 3 prices, focusing on identified patterns and historical data correlations"
+				}
+				OUTPUT {
+					log.GPTC.prediction.day4
+				}
+			}
+		}  
+		((GPTD)) {
+			ANALYSE(log.GPTB.prediction.day4 + log.GPTC.prediction.day4) {
+				INPUT {
+					log.GPTB.prediction.day4,
+					log.GPTC.prediction.day4
+				}
+				PROCESS {
+					"Integrate and analyse predictions from GPTB and GPTC for Day 2, assessing the alignment and discrepancies between the two forecasts."
+				}
+				OUTPUT {
+					log.GPTD.day3
+				}
+			}
+			PREDICT(make a final prediction for day3 stock-prices based on log.GPTD.day3) {
+				INPUT {
+					log.GPTD.day3
+				}
+				PROCESS {
+					"Synthesise insights from the combined analysis to make a final, comprehensive prediction for Day 3 stock prices, leveraging the strengths of both GPTB and GPTC models"
+				}
+				OUTPUT {
+					log.GPTD.prediction.day4
+				}
+
+			}
+		}
+	}
+}
+(...)
+
+INCLUDE GPTF AFTER "X" DAYS
+// figure how many days
+{
+	GPT(F)	-> Analyse all "relevant" logs from GPT(A) to identify patterns or conditions of inaccuracies. Log its findings. Log(F-A)
+	GPT(F)	-> Analyse all "relevant" logs from GPT(B) to identify patterns or conditions of inaccuracies. Log its findings. Log(F-B)
+	GPT(F)	-> Analyse all "relevant" logs from GPT(C) to identify patterns or conditions of inaccuracies. Log its findings. Log(F-C)
+	GPT(F)	-> Analyse all "relevant" logs from GPT(D) to identify patterns or conditions of inaccuracies. Log its findings. Log(F-D)
+	GPT(F)	-> Analyse all "relevant" logs from GPT(E) to identify patterns or conditions of inaccuracies. Log its findings. Log(F-E)
+//figure which logs are "relevant"
+	Include logs on fine_tuning processes for the models every "X" days.
+}
