@@ -1,0 +1,2 @@
+Date	Open	High	Low	Close	Adj.Close	Volume
+09/11/2020	3583.04	3645.99	3547.48	3550.50	3550.50	8570510000
