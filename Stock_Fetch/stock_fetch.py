@@ -6,8 +6,8 @@ import os
 from datetime import datetime, timedelta
 
 # Replace with your Alpha Vantage API key
-API_KEY = ''
-BASE_URL = ''
+API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
+BASE_URL = os.getenv('ALPHA_VANTAGE_BASE_URL')
 
 # Function to fetch data from Alpha Vantage API
 def fetch_data(function, symbol='SPY', outputsize='compact', interval=None):

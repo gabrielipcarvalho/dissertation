@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import os
 
 # Replace with your credentials
-username = ''
-password = ''
-AppID = ''
+username = os.getenv("USERNAME")
+password = os.getenv("PASSWORD")
+AppID = os.getenv("APP_ID")
 
 
 def get_auth_header(username, password, appid):

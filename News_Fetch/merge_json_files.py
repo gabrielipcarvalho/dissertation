@@ -2,7 +2,7 @@ import os
 import json
 
 # Define the directory containing the JSON files
-directory = '/Users/gabriel/Documents/github/dissertation/News_Fetch/News_Data'
+directory = './News_Data'
 
 # Initialize an empty dictionary to hold the merged data
 merged_data = {}
