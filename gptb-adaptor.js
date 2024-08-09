@@ -1,4 +1,4 @@
-// File: GPTB_Adaptor.js
+// File: gptb-adaptor.js
 
 // Import necessary libraries
 const { OpenAI } = require("openai");

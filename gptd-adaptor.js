@@ -1,4 +1,5 @@
-// File: GPTD_Adaptor.js
+// File: gptd-adaptor.js
+
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
 require("dotenv").config();

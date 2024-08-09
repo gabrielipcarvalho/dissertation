@@ -1,4 +1,5 @@
-// File: GPTC_Adaptor.js
+// File: gptc-adaptor.js
+
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
 

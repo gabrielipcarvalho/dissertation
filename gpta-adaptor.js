@@ -1,4 +1,4 @@
-// File: GPTA_Adaptor.js
+// File: gpta-adaptor.js
 
 // Import necessary libraries
 const { OpenAI } = require("openai");

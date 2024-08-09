@@ -1,4 +1,4 @@
-# File: stock_fetch.py
+# File: Stock_Fetch/stock_fetch.py
 
 import requests
 import json

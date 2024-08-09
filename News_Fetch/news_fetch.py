@@ -1,4 +1,4 @@
-# File: news_fetch.py
+# File: News_Fetch/news_fetch.py
 
 import requests
 import time

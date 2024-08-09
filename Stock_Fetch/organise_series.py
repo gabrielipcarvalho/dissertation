@@ -1,3 +1,5 @@
+# file: Stock_Fetch/organise_series.py
+
 import json
 
 DATA_TIME_SERIES = "Monthly Time Series"
@@ -29,4 +31,4 @@ data[DATA_TIME_SERIES] = new_time_series
 with open(PATH_OUTPUT, 'w') as file:
     json.dump(data, file, indent=4)
 
-print("The order has been reversed and the counter has been added.")
+# print("The order has been reversed and the counter has been added.")
