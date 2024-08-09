@@ -1,9 +1,0 @@
-stock_fetch:
-API_KEY = 'FX9B08XH4ZSIDRQX'
-BASE_URL = 'https://www.alphavantage.co/query?'
-
-news_fetch:
-username = 'gabrielisaias.paduacarvalho@griffithuni.edu.au'
-password = 'Albusnox1@'
-AppID = 'e77ae954'
-
