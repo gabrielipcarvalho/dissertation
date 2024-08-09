@@ -139,8 +139,8 @@ pyrightconfig.json
 /SCHEMES
 /News_Fetch/News_Data
 /news_per_day
-data/_ignore
+data/_ignore/
 data/news/news.json
 data/planner/planner.json
-data/stock
-data
+data/stock/
+data/
