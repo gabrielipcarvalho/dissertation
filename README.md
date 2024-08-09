@@ -1,5 +1,3 @@
-Below is a `README.md` file tailored to your project based on the provided code and structure:
-
 ````markdown
 # News and Stock Data Analysis Project
 
