@@ -1,27 +1,27 @@
-// File: orchestration_program.js
+// File: src/orchestration/orchestration-program.js
 
 // Import necessary libraries and adaptors
 const {
 	collectAndLogNews,
 	extractKeyInformation,
 	executeSentimentAnalysis,
-} = require("./gpta_adaptor");
+} = require("../adaptors/gpta-adaptor");
 const {
 	readAndValidateData,
 	readStockPriceData: readBStockPriceData,
 	analyzeImpactOnStockPrices,
 	predictStockPrices,
-} = require("./gptb_adaptor");
+} = require("../adaptors/gptb-adaptor");
 const {
 	readStockPriceData: readCStockPriceData,
 	analyzeStockPricesWithGPT,
-} = require("./gptc_adaptor");
+} = require("../adaptors/gptc-adaptor");
 const {
 	integrateAndAnalyzePredictions,
 	makeFinalPrediction,
-} = require("./gptd_adaptor");
+} = require("../adaptors/gptd-adaptor");
 const fs = require("fs").promises;
-require("dotenv").config();
+require("dotenv").config({ path: "./config/.env" });
 
 // Orchestration function to coordinate adaptors
 const orchestrateAdaptors = async (day) => {
@@ -40,17 +40,17 @@ const orchestrateAdaptors = async (day) => {
 			sentimentAnalysis: sentimentAnalysis,
 		};
 		await fs.writeFile(
-			`Data/log.GPTA.${day}.output.json`,
+			`data/news/log.GPTA.${day}.output.json`,
 			JSON.stringify(logDataGPTA, null, 2),
 			{ encoding: "utf8" }
 		);
 
 		// Step 2: GPTB reads the data validated by GPTA and analyses impact
 		const extractedInfoData = await readAndValidateData(
-			`log.GPTA.${day}.output.json`
+			`data/news/log.GPTA.${day}.output.json`
 		);
 		const stockPricesDataB = await readBStockPriceData(
-			`prices-data-${day}.txt`
+			`data/stock/prices-data-${day}.txt`
 		);
 
 		// Analyze the impact on stock prices using GPTB
@@ -61,7 +61,7 @@ const orchestrateAdaptors = async (day) => {
 			day
 		);
 		await fs.writeFile(
-			`Data/log.GPTB.${day}.impact.json`,
+			`data/stock/log.GPTB.${day}.impact.json`,
 			JSON.stringify({ impactAnalysis: impactAnalysisB }, null, 2),
 			{ encoding: "utf8" }
 		);
@@ -73,20 +73,20 @@ const orchestrateAdaptors = async (day) => {
 			predictionDay
 		);
 		await fs.writeFile(
-			`Data/log.GPTB.prediction.${predictionDay}.json`,
+			`data/stock/log.GPTB.prediction.${predictionDay}.json`,
 			JSON.stringify({ prediction: predictionB }, null, 2),
 			{ encoding: "utf8" }
 		);
 
 		// Step 4: GPTC reads and analyses the raw stock price data
 		const stockPricesDataC = await readCStockPriceData(
-			`prices-data-${day}.txt`
+			`data/stock/prices-data-${day}.txt`
 		);
 		const impactAnalysisC = await analyzeStockPricesWithGPT(
 			stockPricesDataC
 		);
 		await fs.writeFile(
-			`Data/log.GPTC.${day}.analysis.json`,
+			`data/stock/log.GPTC.${day}.analysis.json`,
 			JSON.stringify({ impactAnalysis: impactAnalysisC }, null, 2),
 			{ encoding: "utf8" }
 		);
@@ -95,7 +95,7 @@ const orchestrateAdaptors = async (day) => {
 		const integratedAnalysis = await integrateAndAnalyzePredictions(day);
 		const finalPrediction = await makeFinalPrediction(day);
 		await fs.writeFile(
-			`Data/log.GPTD.${predictionDay}.prediction.json`,
+			`data/stock/log.GPTD.${predictionDay}.prediction.json`,
 			JSON.stringify({ finalPrediction }, null, 2),
 			{ encoding: "utf8" }
 		);

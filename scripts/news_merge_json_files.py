@@ -1,10 +1,10 @@
-#File: News_Fetch/merge_json_files.py
+# File: scripts/news_merge_json_files.py
 
 import os
 import json
 
 # Define the directory containing the JSON files
-directory = './News_Data'
+directory = './data/news'
 
 # Initialize an empty dictionary to hold the merged data
 merged_data = {}

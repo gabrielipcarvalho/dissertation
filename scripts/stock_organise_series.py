@@ -1,16 +1,17 @@
-# file: Stock_Fetch/organise_series.py
+# File: scripts/stock_organise_series.py
 
 import json
 
+# Constants for the JSON data keys and paths
 DATA_TIME_SERIES = "Monthly Time Series"
-PATH_SOURCE = "./stock_data/monthly_SPY.json"
-PATH_OUTPUT = "./stock_data/reverse_monthly_SPY.json"
+PATH_SOURCE = "./data/stock/monthly_SPY.json"
+PATH_OUTPUT = "./data/stock/reverse_monthly_SPY.json"
 
 # Load the JSON data from a file
 with open(PATH_SOURCE, 'r') as file:
     data = json.load(file)
 
-# Extract the data
+# Extract the time series data
 time_series = data[DATA_TIME_SERIES]
 
 # Reverse the order of the time series
@@ -31,4 +32,4 @@ data[DATA_TIME_SERIES] = new_time_series
 with open(PATH_OUTPUT, 'w') as file:
     json.dump(data, file, indent=4)
 
-# print("The order has been reversed and the counter has been added.")
+print("The order has been reversed and the counter has been added.")

@@ -1,8 +1,8 @@
-// File: gptd-adaptor.js
+// File: src/adaptors/gptd-adaptor.js
 
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
-require("dotenv").config();
+require("dotenv").config({ path: "../../config/.env" });
 
 // Configuration using GPTD's specific API key from the .env file
 const openai = new OpenAI({
@@ -11,7 +11,8 @@ const openai = new OpenAI({
 
 // Function to read JSON data from a file
 const readJSONData = async (filename) => {
-	const filePath = `Data/${filename}`;
+	// Updated the file path to align with your project structure
+	const filePath = `data/${filename}`;
 	try {
 		const dataJson = await fs.readFile(filePath, { encoding: "utf8" });
 		return JSON.parse(dataJson);
@@ -61,7 +62,7 @@ const integrateAndAnalyzePredictions = async (day) => {
 
 		const combinedAnalysis = completion.choices[0].message.content.trim();
 		await fs.writeFile(
-			`Data/log.GPTD.${day}.analysis.json`,
+			`data/log.GPTD.${day}.analysis.json`,
 			JSON.stringify({ combinedAnalysis }, null, 2),
 			{ encoding: "utf8" }
 		);
@@ -80,7 +81,7 @@ const integrateAndAnalyzePredictions = async (day) => {
 const makeFinalPrediction = async (day) => {
 	try {
 		const analysisData = await readJSONData(
-			`log.GPTD.${day}.analysis.json`
+			`data/log.GPTD.${day}.analysis.json`
 		);
 
 		const nextDay = `day${parseInt(day.replace("day", "")) + 1}`;
@@ -94,7 +95,7 @@ const makeFinalPrediction = async (day) => {
 				{
 					role: "system",
 					content:
-						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, enabling validation against actual market outcomes. I repeate, you must state a percentage and if it is going to rise or fall, this is not an option, it is a necessity, you must draw from what you read the conclusion of a rise or fall on prices and by exactly how much.",
+						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, enabling validation against actual market outcomes.",
 				},
 				{
 					role: "user",
@@ -113,7 +114,7 @@ const makeFinalPrediction = async (day) => {
 
 		const finalPrediction = completion.choices[0].message.content.trim();
 		await fs.writeFile(
-			`Data/log.GPTD.${nextDay}.prediction.json`,
+			`data/log.GPTD.${nextDay}.prediction.json`,
 			JSON.stringify({ finalPrediction }, null, 2),
 			{ encoding: "utf8" }
 		);

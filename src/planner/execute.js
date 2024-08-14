@@ -1,6 +1,6 @@
-// File: execute_planner.js
+// File: src/planner/execute.js
 
-const { createPlanner } = require(".");
+const { createPlanner } = require("./index");
 
 async function runPlanner() {
 	try {

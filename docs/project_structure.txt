@@ -1,0 +1,55 @@
+The idea:
+
+.
+├── data                    # For all data files (input/output)
+│   ├── news                # Subfolder for news-related data
+│   │   ├── day0.txt
+│   │   └── ...             # Other news data files
+│   └── stock               # Subfolder for stock-related data
+│       ├── daily_SPY.json
+│       ├── monthly_SPY.json
+│       ├── weekly_SPY.json
+│       └── ...             # Other stock data files
+├── src                     # Source code for the project
+│   ├── news_fetch          # Python code related to news fetching
+│   │   ├── __init__.py     # To make it a package
+│   │   ├── fetch.py
+│   │   ├── sort.py
+│   │   └── utils.py        # Utility functions if any
+│   ├── stock_fetch         # Python code related to stock fetching
+│   │   ├── __init__.py
+│   │   ├── fetch.py
+│   │   ├── organise.py
+│   │   └── utils.py
+│   ├── adaptors            # Node.js adaptors for GPT integration
+│   │   ├── gpta.js
+│   │   ├── gptb.js
+│   │   ├── gptc.js
+│   │   ├── gptd.js
+│   │   └── index.js        # Index file to export adaptors
+│   ├── planner             # Code related to planning and orchestration
+│   │   ├── index.js        # Main planner file
+│   │   ├── execute.js
+│   │   └── utils.js        # Any utility functions
+│   └── orchestration       # Code for the orchestration program
+│       ├── index.js        # Main orchestration program file
+│       ├── planner.js
+│       └── utils.js        # Utility functions for orchestration
+├── tests                   # Unit tests for all components
+│   ├── news_fetch
+│   ├── stock_fetch
+│   ├── adaptors
+│   ├── planner
+│   └── orchestration
+├── scripts                 # Utility scripts
+│   ├── merge_json.py       # Example script for merging JSON files
+│   └── ...
+├── docs                    # Documentation and pseudo-code
+│   └── Pseudo-Code-v07.02.24.txt
+├── config                  # Configuration files
+│   ├── env.example         # Example environment variables file
+│   └── ...
+├── requirements.txt        # Python dependencies
+├── package.json            # Node.js dependencies and scripts
+├── README.md               # Project overview and instructions
+└── .gitignore              # Files/folders to ignore in git

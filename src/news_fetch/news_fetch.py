@@ -1,4 +1,4 @@
-# File: News_Fetch/news_fetch.py
+# File: src/news_fetch/news_fetch.py
 
 import requests
 import time
@@ -6,8 +6,10 @@ import json
 from pprint import pprint
 from datetime import datetime, timedelta
 import os
+from dotenv import load_dotenv
 
-# Replace with your credentials
+load_dotenv(dotenv_path='../../config/.env')
+
 username = os.getenv("USERNAME")
 password = os.getenv("PASSWORD")
 AppID = os.getenv("APP_ID")
@@ -120,11 +122,11 @@ def fetch_and_save_news_for_day(date, counter):
     filtered_stories = filter_stories(stories)
 
     # Ensure the directory exists
-    os.makedirs('./News_Data', exist_ok=True)
+    os.makedirs('./data/news', exist_ok=True)
 
     # Save the filtered stories to a JSON file
     if filtered_stories:
-        filename = f"./News_Data/{counter}_{date.replace('-', '_')}.json"
+        filename = f"./data/news/{counter}_{date.replace('-', '_')}.json"
         with open(filename, "w") as file:
             json.dump(filtered_stories, file, indent=4)
         print(f"Filtered stories saved to {filename}")

@@ -1,15 +1,15 @@
-// File: planner.js
+// File: src/planner/index.js
 
 const fs = require("fs").promises;
 const path = require("path");
 require("dotenv").config();
 
 // Define paths to the JSON files using environment variables
-const dailyPath = process.env.DAILY_PATH;
-const weeklyPath = process.env.WEEKLY_PATH;
-const monthlyPath = process.env.MONTHLY_PATH;
-const newsPath = process.env.NEWS_PATH;
-const plannerPath = process.env.PLANNER_PATH;
+const dailyPath = path.join(__dirname, "../../data/stock/daily_SPY.json");
+const weeklyPath = path.join(__dirname, "../../data/stock/weekly_SPY.json");
+const monthlyPath = path.join(__dirname, "../../data/stock/monthly_SPY.json");
+const newsPath = path.join(__dirname, "../../data/news/news.json");
+const plannerPath = path.join(__dirname, "../../data/planner/planner.json");
 
 async function readJSON(filePath) {
 	try {

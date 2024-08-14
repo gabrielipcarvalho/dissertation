@@ -1,9 +1,12 @@
-# File: Stock_Fetch/stock_fetch.py
+# File: src/stock_fetch/stock_fetch.py
 
 import requests
 import json
 import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path='../../config/.env')
 
 # Replace with your Alpha Vantage API key
 API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
@@ -49,8 +52,8 @@ def filter_data_by_date(data, start_date, end_date, key):
 
 # Function to save data to a JSON file
 def save_data(data, filename):
-    os.makedirs('stock_data', exist_ok=True)
-    filepath = os.path.join('stock_data', filename)
+    os.makedirs('data/stock', exist_ok=True)
+    filepath = os.path.join('data/stock', filename)
     with open(filepath, 'w') as file:
         json.dump(data, file, indent=4)
     print(f"Data saved to {filepath}")

@@ -1,7 +1,8 @@
-// File: gptc-adaptor.js
+// File: src/adaptors/gptc-adaptor.js
 
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
+require("dotenv").config({ path: "../../config/.env" });
 
 // Configuration using GPTC's specific API key from the .env file
 const openai = new OpenAI({
@@ -10,7 +11,8 @@ const openai = new OpenAI({
 
 // Function to read and parse stock price data from a TSV file
 const readStockPriceData = async (filename) => {
-	const filePath = `Data/${filename}`;
+	// Updated the file path to align with your project structure
+	const filePath = `data/stock/${filename}`;
 	try {
 		const stockPriceDataText = await fs.readFile(filePath, {
 			encoding: "utf8",

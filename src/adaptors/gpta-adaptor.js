@@ -1,9 +1,9 @@
-// File: gpta-adaptor.js
+// File: src/adaptors/gpta-adaptor.js
 
 // Import necessary libraries
 const { OpenAI } = require("openai");
 const fs = require("fs").promises; // Using fs.promises for async file operations
-require("dotenv").config();
+require("dotenv").config({ path: "../../config/.env" });
 
 // Configuration using GPTA's specific API key from the .env file
 const openai = new OpenAI({
@@ -12,14 +12,14 @@ const openai = new OpenAI({
 
 // Utility function to log data to a file, ensuring it is in JSON format
 const logToFile = async (filename, data) => {
-	const path = `Data/${filename}`;
+	const path = `data/news/${filename}`;
 	const dataToLog = JSON.stringify(data, null, 2); // Convert data to a JSON string
 	await fs.writeFile(path, dataToLog, { encoding: "utf8" }); // Write data as JSON
 };
 
 // Function to collect and log news data from a file
 const collectAndLogNews = async (day) => {
-	const filePath = `Data/news-data-${day}.txt`;
+	const filePath = `data/news/news-data-${day}.txt`;
 
 	try {
 		const newsDataText = await fs.readFile(filePath, {
