@@ -2,33 +2,26 @@
 
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
-require("dotenv").config({ path: "../../config/.env" });
+const path = require("path");
+require("dotenv").config({
+	path: path.resolve(__dirname, "../../config/.env"),
+});
 
 // Configuration using GPTC's specific API key from the .env file
 const openai = new OpenAI({
 	apiKey: process.env.GPTC_API_KEY,
 });
 
-// Function to read and parse stock price data from a TSV file
-const readStockPriceData = async (filename) => {
-	// Updated the file path to align with your project structure
-	const filePath = `data/stock/${filename}`;
+// Function to read and parse stock price data from JSON file
+const readStockPriceData = async (day) => {
+	const filePath = path.resolve(__dirname, "../../data/stock/daily_SPY.json");
 	try {
-		const stockPriceDataText = await fs.readFile(filePath, {
-			encoding: "utf8",
-		});
-		const rows = stockPriceDataText
-			.trim()
-			.split("\n")
-			.map((row) => row.split("\t"));
-		const headers = rows.shift(); // Extract headers
-		const data = rows.map((row) => {
-			return row.reduce((obj, value, index) => {
-				obj[headers[index]] = value;
-				return obj;
-			}, {});
-		});
-		return data;
+		const stockData = JSON.parse(await fs.readFile(filePath, "utf8"));
+		const dailyData = stockData["Time Series (Daily)"][day];
+		if (!dailyData) {
+			throw new Error(`Stock price data for ${day} not found`);
+		}
+		return dailyData;
 	} catch (error) {
 		console.error(
 			`Error reading stock price data from file: ${filePath}`,
@@ -38,11 +31,15 @@ const readStockPriceData = async (filename) => {
 	}
 };
 
-// Function to analyze stock prices using GPT model
-const analyzeStockPricesWithGPT = async (stockPrices) => {
-	const prompt = `Analyze the following stock price data for trends and patterns, and make a concrete prediction for the next trading day. Clearly state whether stock prices are expected to rise or fall, and specify the expected percentage change or price range. Your prediction must be quantitative and actionable, enabling validation against actual market outcomes. Consider historical trends, recent market behaviour, and any notable anomalies in the data. The stock price data to analyze is: ${JSON.stringify(
-		stockPrices
-	)}`;
+// Function to analyze stock prices using GPT model and generate a prediction
+const analyzeStockPricesWithGPT = async (stockPrices, currentDay) => {
+	const prompt = `Analyze the following stock price data for trends and patterns, and make a concrete prediction for the next trading day. Clearly state whether stock prices are expected to rise or fall, and specify the expected percentage change or price range. Your prediction must be quantitative and actionable, enabling validation against actual market outcomes and also enabling fine-tuning. Consider historical trends, market behavior, and any notable anomalies in the data.
+
+Prediction: Raise or Fall ?
+How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
+
+The stock price data to analyze is: ${JSON.stringify(stockPrices)}`;
 
 	try {
 		const completion = await openai.chat.completions.create({
@@ -80,8 +77,85 @@ const analyzeStockPricesWithGPT = async (stockPrices) => {
 	}
 };
 
-// Export functions to be used by the orchestration program
+// Function to log the GPTC results to a JSON file
+const logGptcResults = async (position, day, prediction) => {
+	console.log(
+		`Logging GPTC prediction results for position ${position}, day ${day}...`
+	);
+	const logFilePath = path.resolve(
+		__dirname,
+		"../../data/logs/gptc.logs.json"
+	);
+
+	// Read existing log data
+	let logData = [];
+	try {
+		const logFileContents = await fs.readFile(logFilePath, "utf8");
+		if (logFileContents.trim()) {
+			logData = JSON.parse(logFileContents);
+		} else {
+			console.log("Log file is empty, starting with a new log file.");
+		}
+	} catch (error) {
+		if (error.code === "ENOENT") {
+			console.log("Log file not found, creating a new one.");
+		} else if (error instanceof SyntaxError) {
+			console.error(
+				"Log file is malformed, starting with a new log file."
+			);
+		} else {
+			throw error;
+		}
+	}
+
+	// Append the new log entry
+	logData.push({
+		position: position,
+		"current day": day,
+		data: {
+			prediction,
+		},
+	});
+
+	// Write the updated log data back to the file
+	await fs.writeFile(logFilePath, JSON.stringify(logData, null, 2), {
+		encoding: "utf8",
+	});
+	console.log(
+		`Prediction results logged successfully for position ${position}, day ${day}.`
+	);
+};
+
+// Main GPTC function
+const gptc = async (position) => {
+	try {
+		console.log(`Starting GPTC processing for position ${position}...`);
+
+		// Load the planner file and get the corresponding daily entry for the position
+		const plannerPath = path.resolve(
+			__dirname,
+			"../../data/planner/planner.json"
+		);
+		const plannerData = JSON.parse(await fs.readFile(plannerPath, "utf8"));
+		const entry = plannerData.find((item) => item.position === position);
+
+		if (!entry || !entry.daily) {
+			throw new Error(`No daily entry found for position ${position}`);
+		}
+
+		const day = entry.daily;
+		const stockPrices = await readStockPriceData(day);
+		const prediction = await analyzeStockPricesWithGPT(stockPrices, day);
+
+		await logGptcResults(position, day, prediction);
+
+		console.log(`GPTC processing completed for position ${position}.`);
+	} catch (error) {
+		console.error(`Error in GPTC for position ${position}:`, error);
+		throw error;
+	}
+};
+
 module.exports = {
-	readStockPriceData,
-	analyzeStockPricesWithGPT,
+	gptc,
 };

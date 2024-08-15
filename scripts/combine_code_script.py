@@ -4,25 +4,25 @@ import os
 
 # Define the directories and file extensions to include
 directories_to_include = [
-    "./scripts",
-    "./src/adaptors",
-    "./src/news_fetch",
-    "./src/orchestration",
-    "./src/planner",
-    "./src/stock_fetch"
+    # "../scripts",
+    "../src/orchestration",
+    "../src/adaptors",
+    # "../src/news_fetch",
+    # "../src/planner",
+    # "../src/stock_fetch"
 ]
 extensions_to_include = ['.py', '.js']
 
 # Define the output file path
-output_file_path = './docs/combined_code.txt'
+output_file_path = '../docs/combined_code.txt'
 
 # Start writing to the output file
 with open(output_file_path, 'w') as output_file:
     for directory in directories_to_include:
         for root, _, files in os.walk(directory):
             for fil in files:
-                if any(file.endswith(ext) for ext in extensions_to_include):
-                    file_path = os.path.join(root, file)
+                if any(fil.endswith(ext) for ext in extensions_to_include):
+                    file_path = os.path.join(root, fil)
                     output_file.write(f"\n{'='*40}\n")
                     output_file.write(f"File: {file_path}\n")
                     output_file.write(f"{'='*40}\n\n")

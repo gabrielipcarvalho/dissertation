@@ -1,4 +1,3 @@
-````markdown
 # News and Stock Data Analysis Project
 
 This project is designed to fetch, process, and analyse news and stock market data, with the goal of extracting key information that can influence market trends. The project utilises Python for data fetching and processing, and Node.js for advanced analytics using GPT models.
@@ -24,7 +23,6 @@ This project is designed to fetch, process, and analyse news and stock market da
 ├── package.json            # Node.js dependencies and scripts
 └── README.md               # Project overview and instructions
 ```
-````
 
 ## Prerequisites
 
@@ -45,8 +43,8 @@ This project is designed to fetch, process, and analyse news and stock market da
 1. **Clone the repository:**
 
     ```bash
-    git clone https://your-repo-url.git
-    cd your-repo
+    git clone ...
+    cd repo
     ```
 
 2. **Install Python dependencies:**
@@ -158,7 +156,7 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contact
 
-For any inquiries or support, please reach out to [your-email@example.com](mailto:your-email@example.com).
+For any inquiries or support, please reach out to [](mailto:your-email@example.com).
 
 ```
 

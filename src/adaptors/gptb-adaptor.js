@@ -3,147 +3,278 @@
 // Import necessary libraries
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
-require("dotenv").config({ path: '../../config/.env' });
+const path = require("path");
+require("dotenv").config({
+	path: path.resolve(__dirname, "../../config/.env"),
+});
+const ProgressBar = require("progress");
 
 // Configuration using GPTB's specific API key from the .env file
 const openai = new OpenAI({
-    apiKey: process.env.GPTB_API_KEY,
+	apiKey: process.env.GPTB_API_KEY,
 });
 
-// Utility function to read and validate JSON data logged by GPTA
-const readAndValidateData = async (filename) => {
-    const filePath = `data/news/${filename}`;
-    try {
-        const dataJson = await fs.readFile(filePath, { encoding: "utf8" });
-        const data = JSON.parse(dataJson);
-        if (!data) {
-            throw new Error("Invalid or empty JSON data");
-        }
-        return data;
-    } catch (error) {
-        console.error(`Error processing file: ${filePath}`, error);
-        throw error; // Ensure errors are propagated up
-    }
+// Function to load the planner file and find the corresponding daily entry for a given position
+const getDailyForPosition = async (position) => {
+	console.log(
+		`Loading planner file to find daily entry for position ${position}...`
+	);
+	const plannerPath = path.resolve(
+		__dirname,
+		"../../data/planner/planner.json"
+	);
+	const plannerData = JSON.parse(await fs.readFile(plannerPath, "utf8"));
+	const entry = plannerData.find((item) => item.position === position);
+
+	if (!entry || !entry.daily) {
+		throw new Error(`No daily entry found for position ${position}`);
+	}
+
+	console.log(`Found daily entry for position ${position}: ${entry.daily}`);
+	return entry.daily;
 };
 
-// Function to read and parse stock price data which is not in JSON format
-const readStockPriceData = async (filename) => {
-    const filePath = `data/stock/${filename}`;
-    try {
-        const stockPriceDataText = await fs.readFile(filePath, {
-            encoding: "utf8",
-        });
-        // Assuming the data is tab-separated; adjust if it uses commas or another delimiter
-        const rows = stockPriceDataText
-            .split("\n")
-            .map((row) => row.split("\t"));
+// Function to fetch stock price data for a given day from daily_SPY.json
+const fetchStockPriceData = async (day) => {
+	console.log(`Fetching stock price data for ${day}...`);
+	const stockPath = path.resolve(
+		__dirname,
+		"../../data/stock/daily_SPY.json"
+	);
+	const stockData = JSON.parse(await fs.readFile(stockPath, "utf8"));
 
-        // Optionally convert rows into a more structured format if needed
-        const headers = rows[0];
-        const data = rows.slice(1).map((row) => {
-            let rowData = {};
-            row.forEach((value, index) => {
-                rowData[headers[index]] = value;
-            });
-            return rowData;
-        });
+	const dailyData = stockData["Time Series (Daily)"][day];
+	if (!dailyData) {
+		throw new Error(`Stock price data for ${day} not found`);
+	}
 
-        return data; // Return parsed data as an array of objects
-    } catch (error) {
-        console.error(`Error processing stock price file: ${filePath}`, error);
-        throw error;
-    }
+	console.log(`Fetched stock price data for ${day}`);
+	return dailyData;
 };
 
-// Function to analyze how news, sentiment, and stock prices affected market trends
+// Function to fetch sentiment analysis from gpta.logs.json for a given position
+const fetchSentimentAnalysis = async (position) => {
+	console.log(`Fetching sentiment analysis for position ${position}...`);
+	const logPath = path.resolve(__dirname, "../../data/logs/gpta.logs.json");
+	const logData = JSON.parse(await fs.readFile(logPath, "utf8"));
+
+	const filteredLogs = logData.filter((entry) => entry.position === position);
+
+	if (filteredLogs.length === 0) {
+		throw new Error(`No GPTA logs found for position ${position}`);
+	}
+
+	const sentimentAnalysis = filteredLogs.map((entry) => ({
+		sentimentAnalysis: entry.data["sentiment analysis"],
+		currentDay: entry["current day"],
+	}));
+
+	console.log(`Fetched sentiment analysis for position ${position}`);
+	return sentimentAnalysis;
+};
+
+// Function to analyze how sentiment and stock prices affected market trends
 const analyzeImpactOnStockPrices = async (
-    extractedInfo,
-    sentimentAnalysis,
-    stockPrices,
-    day
+	sentimentAnalysis,
+	stockPrices,
+	day
 ) => {
-    const prompt = `Utilise the following data to conduct a comprehensive analysis of how these factors might influence stock price movements for ${day}. Focus on the extracted information, its sentiment analysis, and the corresponding stock price data. Your analysis should cover the following aspects in detail:
+	console.log(`Analyzing impact on stock prices for ${day}...`);
 
-1. **Relevance to Stock Prices**: Identify and explain the direct relevance of the extracted information to stock market trends. Specify the presence of company earnings reports, policy changes, market sentiment shifts, geopolitical events, or other significant factors, and discuss their potential impact on stock prices.
+	const prompt = `Utilise the following data to conduct a comprehensive analysis of how these factors might influence stock price movements for ${day}. Focus on the sentiment analysis and the corresponding stock price data. Your analysis should cover the following aspects in detail:
 
-2. **Sentiment Influence**: Analyse how the sentiment (positive, negative, neutral) expressed in the news correlates with observed or potential stock price movements. Consider whether the sentiment could lead to increased trading volume, market optimism or pessimism, or price volatility, and provide examples to support your analysis.
+1. **Relevance to Stock Prices**: Identify and explain the direct relevance of the sentiment to stock market trends.
 
-3. **Causative Links**: Establish and explain any causative links between the news sentiment and stock price fluctuations. Highlight clear patterns where certain types of news or sentiment consistently impact stock prices, and discuss the strength and reliability of these patterns.
+2. **Sentiment Influence**: Analyse how the sentiment (positive, negative, neutral) correlates with observed or potential stock price movements.
 
-4. **Comparative Analysis**: Compare the impact of the current day's news and sentiment with data from previous days. Identify cumulative effects or changing trends that might influence future stock price predictions. Discuss how these trends could affect market behaviour and provide insights for future analysis.
+3. **Causative Links**: Establish and explain any causative links between the news sentiment and stock price fluctuations.
 
-5. **Potential Anomalies or Exceptions**: Identify and explain any anomalies or exceptions where the expected impact of news sentiment did not align with actual stock price movements. Suggest possible reasons for these discrepancies, considering factors such as market conditions, external influences, or data inconsistencies.
+4. **Comparative Analysis**: Compare the impact of the current day's sentiment with data from previous days.
+
+5. **Potential Anomalies or Exceptions**: Identify and explain any anomalies where the expected impact of sentiment did not align with actual stock price movements.
 
 Provide a detailed and structured analysis, incorporating quantitative and qualitative insights to support your conclusions.`;
 
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-                { role: "system", content: prompt },
-                {
-                    role: "user",
-                    content: JSON.stringify({
-                        extractedInformation: extractedInfo,
-                        sentiment: sentimentAnalysis,
-                        stockPrices: stockPrices,
-                    }),
-                },
-            ],
-        });
+	const combinedData = JSON.stringify({
+		sentimentAnalysis,
+		stockPrices,
+	});
 
-        if (
-            !completion ||
-            !completion.choices ||
-            completion.choices.length === 0
-        ) {
-            throw new Error("Invalid response structure from API.");
-        }
+	const completion = await openai.chat.completions.create({
+		model: "gpt-3.5-turbo",
+		messages: [
+			{ role: "system", content: prompt },
+			{ role: "user", content: combinedData },
+		],
+	});
 
-        const impactAnalysis = completion.choices[0].message.content.trim();
-        await fs.writeFile(
-            `data/logs/log.GPTB.${day}.impact.json`,
-            JSON.stringify({ impactAnalysis }, null, 2),
-            { encoding: "utf8" }
-        );
-        return impactAnalysis;
-    } catch (error) {
-        console.error(
-            `Error analyzing impact on stock prices for ${day}:`,
-            error
-        );
-        throw error;
-    }
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	const analysisResult = completion.choices[0].message.content.trim();
+
+	console.log("Completed analysis of impact on stock prices.");
+	return analysisResult;
+};
+
+// Function to log analysis results to gptb.logs.json
+const logAnalysisResults = async (position, day, analysis) => {
+	console.log(
+		`Logging analysis results for position ${position}, day ${day}...`
+	);
+	const logPath = path.resolve(__dirname, "../../data/logs/gptb.logs.json");
+
+	// Read existing log data
+	let logData = [];
+	try {
+		const logFileContents = await fs.readFile(logPath, "utf8");
+		if (logFileContents.trim()) {
+			logData = JSON.parse(logFileContents);
+		} else {
+			console.log("Log file is empty, starting with a new log file.");
+		}
+	} catch (error) {
+		if (error.code === "ENOENT") {
+			console.log("Log file not found, creating a new one.");
+		} else if (error instanceof SyntaxError) {
+			console.error(
+				"Log file is malformed, starting with a new log file."
+			);
+		} else {
+			throw error;
+		}
+	}
+
+	// Append the new log entry
+	logData.push({
+		position: position,
+		"current day": day,
+		data: {
+			analysis,
+		},
+	});
+
+	// Write the updated log data back to the file
+	await fs.writeFile(logPath, JSON.stringify(logData, null, 2), {
+		encoding: "utf8",
+	});
+	console.log(
+		`Analysis results logged successfully for position ${position}, day ${day}.`
+	);
 };
 
 // Function to predict future stock prices based on the analysis
-const predictStockPrices = async (impactAnalysis, day) => {
-    const prompt = `Using the analysis of news impact and market sentiment from Day ${
-        parseInt(day.replace("day", "")) - 1
-    }, forecast the stock prices for Day ${parseInt(
-        day.replace("day", "")
-    )}. Your prediction should clearly state whether stock prices will rise or fall, by how much, and the reasoning behind your forecast. Ensure that the prediction is quantitative, specifying the expected percentage change or price range. Consider all relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. The prediction must be actionable and precise, enabling further validation and fine-tuning.`;
+const predictStockPrices = async (analysis, currentDay) => {
+	const nextDay = `day${parseInt(currentDay.replace("day", "")) + 1}`;
+	console.log(`Predicting stock prices for ${nextDay}...`);
 
-    try {
-        const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: [
-                { role: "system", content: prompt },
-                {
-                    role: "user",
-                    content: impactAnalysis,
-                },
-            ],
-        });
+	const prompt = `Using the analysis of sentiment impact and market sentiment from ${currentDay}, forecast the stock prices for ${nextDay}. Please provide the prediction in the following format:
 
-        if (
-            !completion ||
-            !completion.choices ||
-            completion.choices.length === 0
-        ) {
-            throw new Error("Invalid response structure from API.");
-        }
+Prediction: Raise or Fall ?
+How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
 
-        const prediction = completion.choices[0].message.content.trim();
-        await fs.writeFile(
-            `data/logs/log
+Ensure that the prediction is quantitative and precise, with a clear percentage change and a solid reasoning behind the forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
+
+	const completion = await openai.chat.completions.create({
+		model: "gpt-3.5-turbo",
+		messages: [
+			{ role: "system", content: prompt },
+			{ role: "user", content: analysis },
+		],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	const prediction = completion.choices[0].message.content.trim();
+	console.log(`Stock price prediction for ${nextDay} completed.`);
+	return prediction;
+};
+
+// Function to log prediction results to gptb.logs.json
+const logPredictionResults = async (position, day, prediction) => {
+	console.log(
+		`Logging prediction results for position ${position}, day ${day}...`
+	);
+	const logPath = path.resolve(__dirname, "../../data/logs/gptb.logs.json");
+
+	// Read existing log data
+	let logData = [];
+	try {
+		const logFileContents = await fs.readFile(logPath, "utf8");
+		if (logFileContents.trim()) {
+			logData = JSON.parse(logFileContents);
+		} else {
+			console.log("Log file is empty, starting with a new log file.");
+		}
+	} catch (error) {
+		if (error.code === "ENOENT") {
+			console.log("Log file not found, creating a new one.");
+		} else if (error instanceof SyntaxError) {
+			console.error(
+				"Log file is malformed, starting with a new log file."
+			);
+		} else {
+			throw error;
+		}
+	}
+
+	// Find the entry for the current day and update it with the prediction
+	const entryIndex = logData.findIndex(
+		(entry) => entry.position === position && entry["current day"] === day
+	);
+
+	if (entryIndex !== -1) {
+		logData[entryIndex].data.prediction = prediction;
+	} else {
+		logData.push({
+			position: position,
+			"current day": day,
+			data: {
+				prediction,
+			},
+		});
+	}
+
+	// Write the updated log data back to the file
+	await fs.writeFile(logPath, JSON.stringify(logData, null, 2), {
+		encoding: "utf8",
+	});
+	console.log(
+		`Prediction results logged successfully for position ${position}, day ${day}.`
+	);
+};
+
+// Function to handle the entire GPTB processing
+const gptb = async (position) => {
+	try {
+		console.log(`Starting GPTB processing for position ${position}...`);
+
+		const day = await getDailyForPosition(position);
+		const stockPrices = await fetchStockPriceData(day);
+		const sentimentAnalysis = await fetchSentimentAnalysis(position);
+
+		const analysis = await analyzeImpactOnStockPrices(
+			sentimentAnalysis,
+			stockPrices,
+			day
+		);
+		await logAnalysisResults(position, day, analysis);
+
+		const prediction = await predictStockPrices(analysis, day);
+		await logPredictionResults(position, day, prediction);
+
+		console.log(`GPTB processing completed for position ${position}.`);
+	} catch (error) {
+		console.error(`Error in GPTB for position ${position}:`, error);
+		throw error;
+	}
+};
+
+// Export the gptb function so it can be used in other files
+module.exports = {
+	gptb,
+};

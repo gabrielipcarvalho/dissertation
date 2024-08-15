@@ -2,7 +2,10 @@
 
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
-require("dotenv").config({ path: "../../config/.env" });
+const path = require("path");
+require("dotenv").config({
+	path: path.resolve(__dirname, "../../config/.env"),
+});
 
 // Configuration using GPTD's specific API key from the .env file
 const openai = new OpenAI({
@@ -10,9 +13,7 @@ const openai = new OpenAI({
 });
 
 // Function to read JSON data from a file
-const readJSONData = async (filename) => {
-	// Updated the file path to align with your project structure
-	const filePath = `data/${filename}`;
+const readJSONData = async (filePath) => {
 	try {
 		const dataJson = await fs.readFile(filePath, { encoding: "utf8" });
 		return JSON.parse(dataJson);
@@ -22,20 +23,73 @@ const readJSONData = async (filename) => {
 	}
 };
 
-// Function to integrate and analyze predictions from GPTB and GPTC
-const integrateAndAnalyzePredictions = async (day) => {
+// Function to log data to JSON file
+const logDataToFile = async (filePath, data) => {
+	let logData = [];
 	try {
-		const nextDay = `day${parseInt(day.replace("day", "")) + 1}`;
-		const gptbPredictionData = await readJSONData(
-			`log.GPTB.prediction.${nextDay}.json`
+		// Attempt to read the log file
+		const logFileContents = await fs.readFile(filePath, "utf8");
+		if (logFileContents.trim()) {
+			logData = JSON.parse(logFileContents);
+		} else {
+			console.log("Log file is empty, starting with a new log file.");
+		}
+	} catch (error) {
+		if (error.code === "ENOENT") {
+			console.log("Log file not found, creating a new one.");
+		} else if (error instanceof SyntaxError) {
+			console.error(
+				"Log file is malformed, starting with a new log file."
+			);
+		} else {
+			throw error;
+		}
+	}
+
+	// Append the new log entry
+	logData.push(data);
+
+	// Write the updated log data back to the file
+	await fs.writeFile(filePath, JSON.stringify(logData, null, 2), {
+		encoding: "utf8",
+	});
+	console.log(`Data logged successfully to ${filePath}.`);
+};
+
+// Function to fetch prediction data from logs
+const fetchPredictionData = async (position, filePath) => {
+	const logData = await readJSONData(filePath);
+	const entry = logData.find((item) => item.position === position);
+	if (!entry) {
+		throw new Error(
+			`No entry found for position ${position} in ${filePath}`
 		);
-		const gptcAnalysisData = await readJSONData(
-			`log.GPTC.${day}.analysis.json`
+	}
+	return entry.data.prediction;
+};
+
+// Function to integrate and analyze predictions from GPTB and GPTC
+const integrateAndAnalyzePredictions = async (position, currentDay) => {
+	try {
+		const gptbLogsPath = path.resolve(
+			__dirname,
+			"../../data/logs/gptb.logs.json"
+		);
+		const gptcLogsPath = path.resolve(
+			__dirname,
+			"../../data/logs/gptc.logs.json"
 		);
 
-		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${day}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${JSON.stringify(
-			gptbPredictionData.prediction
-		)}, Predictions from GPTC: ${JSON.stringify(gptcAnalysisData)}.`;
+		const gptbPrediction = await fetchPredictionData(
+			position,
+			gptbLogsPath
+		);
+		const gptcPrediction = await fetchPredictionData(
+			position,
+			gptcLogsPath
+		);
+
+		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${currentDay}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${gptbPrediction}, Predictions from GPTC: ${gptcPrediction}.`;
 
 		const completion = await openai.chat.completions.create({
 			model: "gpt-3.5-turbo",
@@ -61,11 +115,19 @@ const integrateAndAnalyzePredictions = async (day) => {
 		}
 
 		const combinedAnalysis = completion.choices[0].message.content.trim();
-		await fs.writeFile(
-			`data/log.GPTD.${day}.analysis.json`,
-			JSON.stringify({ combinedAnalysis }, null, 2),
-			{ encoding: "utf8" }
+		const logData = {
+			position: position,
+			"current day": currentDay,
+			data: {
+				analysis: combinedAnalysis,
+			},
+		};
+
+		const gptdLogsPath = path.resolve(
+			__dirname,
+			"../../data/logs/gptd.logs.json"
 		);
+		await logDataToFile(gptdLogsPath, logData);
 
 		return combinedAnalysis;
 	} catch (error) {
@@ -78,16 +140,32 @@ const integrateAndAnalyzePredictions = async (day) => {
 };
 
 // Function to make a final prediction for the next trading day stock prices
-const makeFinalPrediction = async (day) => {
+const makeFinalPrediction = async (position, currentDay) => {
 	try {
-		const analysisData = await readJSONData(
-			`data/log.GPTD.${day}.analysis.json`
+		const gptdLogsPath = path.resolve(
+			__dirname,
+			"../../data/logs/gptd.logs.json"
+		);
+		const logData = await readJSONData(gptdLogsPath);
+		const entry = logData.find(
+			(item) =>
+				item.position === position && item["current day"] === currentDay
 		);
 
-		const nextDay = `day${parseInt(day.replace("day", "")) + 1}`;
-		const prompt = `Based on the integrated analysis from Day ${day}, synthesize insights to make a final, comprehensive prediction for ${nextDay} stock prices. Your prediction should clearly state whether stock prices are expected to rise or fall, by how much, and the reasoning behind your forecast. Ensure the prediction is quantitative, specifying the expected percentage change or price range. Consider historical trends, recent market behaviour, and any notable anomalies in the data. Analysis data: ${JSON.stringify(
-			analysisData
-		)}.`;
+		if (!entry) {
+			throw new Error(
+				`No analysis data found for position ${position} and day ${currentDay} in GPTD logs.`
+			);
+		}
+
+		const analysisData = entry.data.analysis;
+		const nextDay = `day${parseInt(currentDay.replace("day", "")) + 1}`;
+
+		const prompt = `Based on the integrated analysis from Day ${currentDay}, synthesize insights to make a final, comprehensive prediction for ${nextDay} stock prices. Your prediction should clearly state whether stock prices are expected to rise or fall, by how much, and the reasoning behind your forecast. Ensure the prediction is quantitative, specifying the expected percentage change or price range. Consider historical trends, recent market behaviour, and any notable anomalies in the data. Ensure that the prediction is quantitative and precise, with a clear percentage and a solid reasoning behind the forecast. The prediction must be actionable and suitable for further validation and fine-tuning.
+
+Prediction: Raise or Fall ?
+How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Analysis data: ${analysisData}.`;
 
 		const completion = await openai.chat.completions.create({
 			model: "gpt-3.5-turbo",
@@ -113,11 +191,15 @@ const makeFinalPrediction = async (day) => {
 		}
 
 		const finalPrediction = completion.choices[0].message.content.trim();
-		await fs.writeFile(
-			`data/log.GPTD.${nextDay}.prediction.json`,
-			JSON.stringify({ finalPrediction }, null, 2),
-			{ encoding: "utf8" }
-		);
+		const logDataEntry = {
+			position: position,
+			"current day": nextDay,
+			data: {
+				prediction: finalPrediction,
+			},
+		};
+
+		await logDataToFile(gptdLogsPath, logDataEntry);
 
 		return finalPrediction;
 	} catch (error) {
@@ -126,8 +208,38 @@ const makeFinalPrediction = async (day) => {
 	}
 };
 
-// Export functions to be used by the orchestration program
+// Main GPTD function to integrate analysis and make predictions
+const gptd = async (position) => {
+	try {
+		console.log(`Starting GPTD processing for position ${position}...`);
+
+		// Load the planner file and get the corresponding daily entry for the position
+		const plannerPath = path.resolve(
+			__dirname,
+			"../../data/planner/planner.json"
+		);
+		const plannerData = JSON.parse(await fs.readFile(plannerPath, "utf8"));
+		const entry = plannerData.find((item) => item.position === position);
+
+		if (!entry || !entry.daily) {
+			throw new Error(`No daily entry found for position ${position}`);
+		}
+
+		const currentDay = entry.daily;
+
+		// Integrate and analyze predictions from GPTB and GPTC
+		await integrateAndAnalyzePredictions(position, currentDay);
+
+		// Make final prediction for the next trading day stock prices
+		await makeFinalPrediction(position, currentDay);
+
+		console.log(`GPTD processing completed for position ${position}.`);
+	} catch (error) {
+		console.error(`Error in GPTD for position ${position}:`, error);
+		throw error;
+	}
+};
+
 module.exports = {
-	integrateAndAnalyzePredictions,
-	makeFinalPrediction,
+	gptd,
 };

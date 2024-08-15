@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "dotenv": "^16.4.5",
-    "openai": "^4.38.5"
+    "openai": "^4.38.5",
+    "progress": "^2.0.3"
   }
 }
