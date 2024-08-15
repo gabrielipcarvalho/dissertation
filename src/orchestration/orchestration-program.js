@@ -14,6 +14,9 @@ const {
 	gptd, // GPTD function
 } = require("../adaptors/gptd-adaptor");
 const path = require("path");
+
+const { main: evalGptb } = require("../eval_adaptors/eval-gptb");
+
 require("dotenv").config({ path: "../../config/.env" });
 
 // Load the planner file
@@ -25,9 +28,9 @@ const plannerData = require(path.resolve(
 // Orchestration function to coordinate adaptors
 const orchestrateAdaptors = async () => {
 	try {
-		// Iterate over each entry in the planner
-		for (const entry of plannerData) {
-			const { position, daily } = entry;
+		// Iterate over each entry in the planner except the last one
+		for (let i = 0; i < plannerData.length - 1; i++) {
+			const { position, daily } = plannerData[i];
 
 			// Step 1: gpta() processes the news data
 			await gpta(position);
@@ -40,6 +43,9 @@ const orchestrateAdaptors = async () => {
 
 			// Step 4: gptd() integrates predictions from gptb() and gptc()
 			await gptd(position);
+
+			// Step 5: eval-gptb() evaluates the predictions made by GPTB
+			await evalGptb(position);
 
 			console.log(
 				`Orchestration completed for position ${position}, day ${daily}`

@@ -18,16 +18,15 @@ const readJSONData = async (filePath) => {
 		const dataJson = await fs.readFile(filePath, { encoding: "utf8" });
 		return JSON.parse(dataJson);
 	} catch (error) {
-		console.error(`Error reading JSON file: ${filePath}`, error);
+		console.error(`Error reading JSON file: ${filePath}`, error); // Use backticks here
 		throw error;
 	}
 };
 
-// Function to log data to JSON file
-const logDataToFile = async (filePath, data) => {
+// Function to log or update data in a JSON file
+const logDataToFile = async (filePath, position, currentDay, newData) => {
 	let logData = [];
 	try {
-		// Attempt to read the log file
 		const logFileContents = await fs.readFile(filePath, "utf8");
 		if (logFileContents.trim()) {
 			logData = JSON.parse(logFileContents);
@@ -46,14 +45,33 @@ const logDataToFile = async (filePath, data) => {
 		}
 	}
 
-	// Append the new log entry
-	logData.push(data);
+	// Find the existing log entry
+	let logEntry = logData.find(
+		(item) =>
+			item.position === position && item["current day"] === currentDay
+	);
+
+	if (logEntry) {
+		// Merge new data with the existing data
+		logEntry.data = { ...logEntry.data, ...newData };
+	} else {
+		// If no entry exists, create a new one
+		logEntry = {
+			position: position,
+			"current day": currentDay,
+			data: newData,
+		};
+		logData.push(logEntry);
+	}
 
 	// Write the updated log data back to the file
 	await fs.writeFile(filePath, JSON.stringify(logData, null, 2), {
 		encoding: "utf8",
 	});
-	console.log(`Data logged successfully to ${filePath}.`);
+
+	// Convert the absolute path to a relative path for logging
+	const relativePath = path.relative(process.cwd(), filePath);
+	console.log(`Data logged successfully to ${relativePath}.`); // Use backticks here
 };
 
 // Function to fetch prediction data from logs
@@ -62,7 +80,7 @@ const fetchPredictionData = async (position, filePath) => {
 	const entry = logData.find((item) => item.position === position);
 	if (!entry) {
 		throw new Error(
-			`No entry found for position ${position} in ${filePath}`
+			`No entry found for position ${position} in ${filePath}` // Use backticks here
 		);
 	}
 	return entry.data.prediction;
@@ -89,7 +107,7 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 			gptcLogsPath
 		);
 
-		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${currentDay}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${gptbPrediction}, Predictions from GPTC: ${gptcPrediction}.`;
+		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${currentDay}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${gptbPrediction}, Predictions from GPTC: ${gptcPrediction}.`; // Use backticks here
 
 		const completion = await openai.chat.completions.create({
 			model: "gpt-3.5-turbo",
@@ -127,7 +145,9 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 			__dirname,
 			"../../data/logs/gptd.logs.json"
 		);
-		await logDataToFile(gptdLogsPath, logData);
+		await logDataToFile(gptdLogsPath, position, currentDay, {
+			analysis: combinedAnalysis,
+		});
 
 		return combinedAnalysis;
 	} catch (error) {
@@ -139,6 +159,7 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 	}
 };
 
+// Function to make a final prediction for the next trading day stock prices
 // Function to make a final prediction for the next trading day stock prices
 const makeFinalPrediction = async (position, currentDay) => {
 	try {
@@ -163,7 +184,7 @@ const makeFinalPrediction = async (position, currentDay) => {
 
 		const prompt = `Based on the integrated analysis from Day ${currentDay}, synthesize insights to make a final, comprehensive prediction for ${nextDay} stock prices. Your prediction should clearly state whether stock prices are expected to rise or fall, by how much, and the reasoning behind your forecast. Ensure the prediction is quantitative, specifying the expected percentage change or price range. Consider historical trends, recent market behaviour, and any notable anomalies in the data. Ensure that the prediction is quantitative and precise, with a clear percentage and a solid reasoning behind the forecast. The prediction must be actionable and suitable for further validation and fine-tuning.
 
-Prediction: Raise or Fall ?
+Prediction: Raise or Fall?
 How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Analysis data: ${analysisData}.`;
 
@@ -191,15 +212,12 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 		}
 
 		const finalPrediction = completion.choices[0].message.content.trim();
-		const logDataEntry = {
-			position: position,
-			"current day": nextDay,
-			data: {
-				prediction: finalPrediction,
-			},
-		};
 
-		await logDataToFile(gptdLogsPath, logDataEntry);
+		// Update the existing entry with the new prediction
+		entry.data.prediction = finalPrediction;
+
+		// Write the updated log data back to the file
+		await logDataToFile(gptdLogsPath, position, currentDay, entry.data);
 
 		return finalPrediction;
 	} catch (error) {
@@ -211,7 +229,7 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 // Main GPTD function to integrate analysis and make predictions
 const gptd = async (position) => {
 	try {
-		console.log(`Starting GPTD processing for position ${position}...`);
+		console.log(`Starting GPTD processing for position ${position}...`); // Use backticks here
 
 		// Load the planner file and get the corresponding daily entry for the position
 		const plannerPath = path.resolve(
@@ -222,7 +240,7 @@ const gptd = async (position) => {
 		const entry = plannerData.find((item) => item.position === position);
 
 		if (!entry || !entry.daily) {
-			throw new Error(`No daily entry found for position ${position}`);
+			throw new Error(`No daily entry found for position ${position}`); // Use backticks here
 		}
 
 		const currentDay = entry.daily;
@@ -233,9 +251,9 @@ const gptd = async (position) => {
 		// Make final prediction for the next trading day stock prices
 		await makeFinalPrediction(position, currentDay);
 
-		console.log(`GPTD processing completed for position ${position}.`);
+		console.log(`GPTD processing completed for position ${position}.`); // Use backticks here
 	} catch (error) {
-		console.error(`Error in GPTD for position ${position}:`, error);
+		console.error(`Error in GPTD for position ${position}:`, error); // Use backticks here
 		throw error;
 	}
 };
