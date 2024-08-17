@@ -1,5 +1,185 @@
 
 ========================================
+File: ../scripts/news_sort_json.py
+========================================
+
+# File: scripts/news_sort_json.py
+
+import json
+import re
+
+def verify_keys(input_file):
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+    
+    # Define a regular expression pattern for the expected key format.
+    pattern = re.compile(r'^\d+_\d{4}_\d{2}_\d{2}$')
+    
+    invalid_keys = []
+    
+    # Loop over the keys to identify invalid ones and print their context.
+    for key in data.keys():
+        if not pattern.match(key):
+            print(f"Invalid key found: '{key}'")
+            invalid_keys.append(key)
+            # Print the context of the invalid key
+            print(f"Context for invalid key '{key}': {json.dumps(data[key], indent=4)}")
+    
+    return invalid_keys
+
+def sort_json(input_file, output_file):
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+    
+    # Remove keys that do not match the expected format before sorting.
+    invalid_keys = verify_keys(input_file)
+    for key in invalid_keys:
+        data.pop(key, None)
+    
+    # Sort the remaining keys in the JSON file based on the numeric part and the date.
+    sorted_keys = sorted(data.keys(), key=lambda x: (int(x.split('_')[0]), x.split('_')[1]))
+    sorted_data = {key: data[key] for key in sorted_keys}
+    
+    with open(output_file, 'w') as f:
+        json.dump(sorted_data, f, indent=4)
+
+# Paths to input and output files.
+input_file = '../data/news/merged_news_data.json'
+output_file = '../data/news/sorted_output.json'
+
+# Verify keys before sorting.
+verify_keys(input_file)
+
+# Execute the sorting function.
+sort_json(input_file, output_file)
+
+========================================
+File: ../scripts/combine_code_script.py
+========================================
+
+# File: scripts/combine_code_script.py
+
+import os
+
+# Define the directories and file extensions to include
+directories_to_include = [
+    "../scripts",
+    "../src/orchestration",
+    "../src/adaptors",
+    "../src/eval_adaptors",
+    "../src/news_fetch",
+    "../src/planner",
+    "../src/stock_fetch"
+]
+extensions_to_include = ['.py', '.js']
+
+# Define the output file path
+output_file_path = '../docs/combined_code.txt'
+
+# Start writing to the output file
+with open(output_file_path, 'w') as output_file:
+    for directory in directories_to_include:
+        for root, _, files in os.walk(directory):
+            for fil in files:
+                if any(fil.endswith(ext) for ext in extensions_to_include):
+                    file_path = os.path.join(root, fil)
+                    output_file.write(f"\n{'='*40}\n")
+                    output_file.write(f"File: {file_path}\n")
+                    output_file.write(f"{'='*40}\n\n")
+                    with open(file_path, 'r') as f:
+                        output_file.write(f.read())
+                        output_file.write("\n")
+
+    # Include this script's code at the end of the file
+    script_path = './scripts/combine_code_script.py'
+    output_file.write(f"\n{'='*40}\n")
+    output_file.write(f"File: {script_path}\n")
+    output_file.write(f"{'='*40}\n\n")
+    with open(__file__, 'r') as f:
+        output_file.write(f.read())
+        output_file.write("\n")
+
+print(f"All code has been combined into {output_file_path}")
+
+========================================
+File: ../scripts/news_merge_json_files.py
+========================================
+
+# File: scripts/news_merge_json_files.py
+
+import os
+import json
+
+# Define the directory containing the JSON files
+directory = '../data/news'
+
+# Initialize an empty dictionary to hold the merged data
+merged_data = {}
+
+# Loop over all files in the directory
+for filename in os.listdir(directory):
+    if filename.endswith('.json'):
+        # Construct the full file path
+        filepath = os.path.join(directory, filename)
+        
+        # Read the content of the JSON file
+        with open(filepath, 'r', encoding='utf-8') as file:
+            data = json.load(file)
+        
+        # Use the filename (without the extension) as the key in the merged dictionary
+        key = os.path.splitext(filename)[0]
+        merged_data[key] = data
+
+# Define the output file path
+output_file = os.path.join(directory, 'merged_news_data.json')
+
+# Write the merged data to a new JSON file
+with open(output_file, 'w', encoding='utf-8') as outfile:
+    json.dump(merged_data, outfile, ensure_ascii=False, indent=4)
+
+print(f"Merged data has been written to {output_file}")
+
+========================================
+File: ../scripts/stock_organise_series.py
+========================================
+
+# File: scripts/stock_organise_series.py
+
+import json
+
+# Constants for the JSON data keys and paths
+DATA_TIME_SERIES = "Monthly Time Series"
+PATH_SOURCE = "./data/stock/monthly_SPY.json"
+PATH_OUTPUT = "./data/stock/reverse_monthly_SPY.json"
+
+# Load the JSON data from a file
+with open(PATH_SOURCE, 'r') as file:
+    data = json.load(file)
+
+# Extract the time series data
+time_series = data[DATA_TIME_SERIES]
+
+# Reverse the order of the time series
+reversed_time_series = dict(reversed(list(time_series.items())))
+
+# Add a counter to each date
+counter = 1
+new_time_series = {}
+for date in reversed_time_series:
+    new_key = f"{counter}_{date}"
+    new_time_series[new_key] = reversed_time_series[date]
+    counter += 1
+
+# Update the original data with the new time series
+data[DATA_TIME_SERIES] = new_time_series
+
+# Save the updated data back to a file
+with open(PATH_OUTPUT, 'w') as file:
+    json.dump(data, file, indent=4)
+
+print("The order has been reversed and the counter has been added.")
+
+========================================
 File: ../src/orchestration/orchestration-program.js
 ========================================
 
@@ -19,6 +199,9 @@ const {
 	gptd, // GPTD function
 } = require("../adaptors/gptd-adaptor");
 const path = require("path");
+
+const { main: evalGptb } = require("../eval_adaptors/eval-gptb");
+
 require("dotenv").config({ path: "../../config/.env" });
 
 // Load the planner file
@@ -30,9 +213,9 @@ const plannerData = require(path.resolve(
 // Orchestration function to coordinate adaptors
 const orchestrateAdaptors = async () => {
 	try {
-		// Iterate over each entry in the planner
-		for (const entry of plannerData) {
-			const { position, daily } = entry;
+		// Iterate over each entry in the planner except the last one
+		for (let i = 0; i < plannerData.length - 1; i++) {
+			const { position, daily } = plannerData[i];
 
 			// Step 1: gpta() processes the news data
 			await gpta(position);
@@ -45,6 +228,9 @@ const orchestrateAdaptors = async () => {
 
 			// Step 4: gptd() integrates predictions from gptb() and gptc()
 			await gptd(position);
+
+			// Step 5: eval-gptb() evaluates the predictions made by GPTB
+			await evalGptb(position);
 
 			console.log(
 				`Orchestration completed for position ${position}, day ${daily}`
@@ -104,8 +290,11 @@ const readStockPriceData = async (day) => {
 const analyzeStockPricesWithGPT = async (stockPrices, currentDay) => {
 	const prompt = `Analyze the following stock price data for trends and patterns, and make a concrete prediction for the next trading day. Clearly state whether stock prices are expected to rise or fall, and specify the expected percentage change or price range. Your prediction must be quantitative and actionable, enabling validation against actual market outcomes and also enabling fine-tuning. Consider historical trends, market behavior, and any notable anomalies in the data.
 
-Prediction: Raise or Fall ?
-How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Prediction:
+- Direction: Raise or Fall?
+- Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+- Confidence: Express the confidence level of this prediction as a percentage (0-100%).
+
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
 
 The stock price data to analyze is: ${JSON.stringify(stockPrices)}`;
@@ -117,7 +306,7 @@ The stock price data to analyze is: ${JSON.stringify(stockPrices)}`;
 				{
 					role: "system",
 					content:
-						"You are a financial analyst. Your task is to analyze the provided stock price data and make a concrete prediction about future stock price movements. Your prediction must be clear, quantitative, and actionable.",
+						"You are a financial analyst. Your task is to analyze the provided stock price data and make a concrete prediction about future stock price movements. Your prediction must be clear, quantitative, actionable, and include a confidence level.",
 				},
 				{ role: "user", content: prompt },
 			],
@@ -259,11 +448,10 @@ const readJSONData = async (filePath) => {
 	}
 };
 
-// Function to log data to JSON file
-const logDataToFile = async (filePath, data) => {
+// Function to log or update data in a JSON file
+const logDataToFile = async (filePath, position, currentDay, newData) => {
 	let logData = [];
 	try {
-		// Attempt to read the log file
 		const logFileContents = await fs.readFile(filePath, "utf8");
 		if (logFileContents.trim()) {
 			logData = JSON.parse(logFileContents);
@@ -282,14 +470,33 @@ const logDataToFile = async (filePath, data) => {
 		}
 	}
 
-	// Append the new log entry
-	logData.push(data);
+	// Find the existing log entry
+	let logEntry = logData.find(
+		(item) =>
+			item.position === position && item["current day"] === currentDay
+	);
+
+	if (logEntry) {
+		// Merge new data with the existing data
+		logEntry.data = { ...logEntry.data, ...newData };
+	} else {
+		// If no entry exists, create a new one
+		logEntry = {
+			position: position,
+			"current day": currentDay,
+			data: newData,
+		};
+		logData.push(logEntry);
+	}
 
 	// Write the updated log data back to the file
 	await fs.writeFile(filePath, JSON.stringify(logData, null, 2), {
 		encoding: "utf8",
 	});
-	console.log(`Data logged successfully to ${filePath}.`);
+
+	// Convert the absolute path to a relative path for logging
+	const relativePath = path.relative(process.cwd(), filePath);
+	console.log(`Data logged successfully to ${relativePath}.`);
 };
 
 // Function to fetch prediction data from logs
@@ -363,7 +570,9 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 			__dirname,
 			"../../data/logs/gptd.logs.json"
 		);
-		await logDataToFile(gptdLogsPath, logData);
+		await logDataToFile(gptdLogsPath, position, currentDay, {
+			analysis: combinedAnalysis,
+		});
 
 		return combinedAnalysis;
 	} catch (error) {
@@ -397,10 +606,13 @@ const makeFinalPrediction = async (position, currentDay) => {
 		const analysisData = entry.data.analysis;
 		const nextDay = `day${parseInt(currentDay.replace("day", "")) + 1}`;
 
-		const prompt = `Based on the integrated analysis from Day ${currentDay}, synthesize insights to make a final, comprehensive prediction for ${nextDay} stock prices. Your prediction should clearly state whether stock prices are expected to rise or fall, by how much, and the reasoning behind your forecast. Ensure the prediction is quantitative, specifying the expected percentage change or price range. Consider historical trends, recent market behaviour, and any notable anomalies in the data. Ensure that the prediction is quantitative and precise, with a clear percentage and a solid reasoning behind the forecast. The prediction must be actionable and suitable for further validation and fine-tuning.
+		const prompt = `Based on the integrated analysis from Day ${currentDay}, synthesize insights to make a final, comprehensive prediction for ${nextDay} stock prices. Your prediction should clearly state whether stock prices are expected to rise or fall, by how much, and the reasoning behind your forecast. Ensure the prediction is quantitative, specifying the expected percentage change or price range. Additionally, express the confidence level of this prediction as a percentage (0-100%).
 
-Prediction: Raise or Fall ?
-How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Prediction:
+- Direction: Raise or Fall?
+- Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+- Confidence: Express the confidence level of this prediction as a percentage (0-100%).
+
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Analysis data: ${analysisData}.`;
 
 		const completion = await openai.chat.completions.create({
@@ -409,7 +621,7 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 				{
 					role: "system",
 					content:
-						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, enabling validation against actual market outcomes.",
+						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, including a confidence level, to enable validation against actual market outcomes.",
 				},
 				{
 					role: "user",
@@ -427,15 +639,12 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 		}
 
 		const finalPrediction = completion.choices[0].message.content.trim();
-		const logDataEntry = {
-			position: position,
-			"current day": nextDay,
-			data: {
-				prediction: finalPrediction,
-			},
-		};
 
-		await logDataToFile(gptdLogsPath, logDataEntry);
+		// Update the existing entry with the new prediction
+		entry.data.prediction = finalPrediction;
+
+		// Write the updated log data back to the file
+		await logDataToFile(gptdLogsPath, position, currentDay, entry.data);
 
 		return finalPrediction;
 	} catch (error) {
@@ -867,11 +1076,14 @@ const predictStockPrices = async (analysis, currentDay) => {
 
 	const prompt = `Using the analysis of sentiment impact and market sentiment from ${currentDay}, forecast the stock prices for ${nextDay}. Please provide the prediction in the following format:
 
-Prediction: Raise or Fall ?
-How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Prediction:
+- Direction: Raise or Fall?
+- Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+- Confidence: Express the confidence level of this prediction as a percentage (0-100%).
+
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
 
-Ensure that the prediction is quantitative and precise, with a clear percentage change and a solid reasoning behind the forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
+Ensure that the prediction is quantitative, precise, and includes a clear confidence level that reflects how certain the model is in its forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
 
 	const completion = await openai.chat.completions.create({
 		model: "gpt-3.5-turbo",
@@ -977,6 +1189,995 @@ module.exports = {
 
 
 ========================================
+File: ../src/eval_adaptors/eval-gptc.js
+========================================
+
+
+
+========================================
+File: ../src/eval_adaptors/eval-gptb.js
+========================================
+
+const fs = require("fs");
+const path = require("path");
+const { OpenAI } = require("openai");
+require("dotenv").config({
+	path: path.resolve(__dirname, "../../config/.env"),
+});
+
+// Configuration using GPTB's specific API key from the .env file
+const openai = new OpenAI({
+	apiKey: process.env.GPTB_API_KEY,
+});
+
+// Function to load JSON data from a file
+function loadJsonFile(filePath) {
+	return JSON.parse(fs.readFileSync(filePath, "utf8"));
+}
+
+// Function to fetch data based on the provided position
+function fetchData(position) {
+	const plannerFilePath = path.join(
+		__dirname,
+		"../../data/planner/planner.json"
+	);
+	const plannerData = loadJsonFile(plannerFilePath);
+
+	const nextEntry = plannerData.find(
+		(entry) => entry.position === position + 1
+	);
+
+	if (!nextEntry) {
+		throw new Error(`No planner data found for position ${position + 1}`);
+	}
+
+	const dailyDate = nextEntry.daily;
+
+	const dailySPYFilePath = path.join(
+		__dirname,
+		"../../data/stock/daily_SPY.json"
+	);
+	const dailySPYData = loadJsonFile(dailySPYFilePath);
+
+	const stockData = dailySPYData["Time Series (Daily)"][dailyDate];
+
+	if (!stockData) {
+		throw new Error(`No stock data found for date ${dailyDate}`);
+	}
+
+	const gptbLogsFilePath = path.join(
+		__dirname,
+		"../../data/logs/gptb.logs.json"
+	);
+	const gptbLogsData = loadJsonFile(gptbLogsFilePath);
+
+	const currentLogEntry = gptbLogsData.find(
+		(entry) => entry.position === position
+	);
+
+	if (!currentLogEntry) {
+		throw new Error(`No GPTB log found for position ${position}`);
+	}
+
+	const predictionData = currentLogEntry.data.prediction;
+
+	return { stockData, predictionData, dailyDate };
+}
+
+// Function to make an API call to OpenAI to evaluate the prediction
+async function evaluatePrediction(stockData, predictionData, dailyDate) {
+	const prompt = `You are given a prediction and the actual stock price data for a specific day. Evaluate how accurate the prediction was in terms of the stock price movement (rise or fall), the magnitude of the movement, and any other relevant details.
+
+Stock Data for ${dailyDate}: ${JSON.stringify(stockData)}
+
+Prediction: ${predictionData}
+
+Please provide a detailed analysis comparing the prediction with the actual stock prices. Highlight any aspects where the prediction was accurate, partially accurate, or incorrect. Additionally, discuss the precision of the predicted magnitude of price changes.`;
+
+	const completion = await openai.chat.completions.create({
+		model: "gpt-3.5-turbo",
+		messages: [
+			{
+				role: "system",
+				content: "You are an expert in stock market analysis.",
+			},
+			{ role: "user", content: prompt },
+		],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	return completion.choices[0].message.content.trim();
+}
+
+// Function to make a second API call to generate structured JSON-like data
+async function generateJsonResponse(
+	position,
+	dailyDate,
+	stockData,
+	predictionData
+) {
+	const prompt = `Please analyze the following stock data and prediction. Provide the information in the JSON format below, which includes the direction and percentage change for both the prediction and the actual outcome.
+
+{
+  "position": ${position + 1},
+  "date": "${dailyDate}",
+  "gptb": {
+    "prediction": {
+      "direction": "rise or fall",
+      "amount": "percentage amount of rise or fall"
+    },
+    "outcome": {
+      "direction": "rise or fall",
+      "amount": "percentage amount of rise or fall"
+    }
+  }
+}
+
+Stock Data for ${dailyDate}: ${JSON.stringify(stockData)}
+Prediction: ${predictionData}`;
+
+	const completion = await openai.chat.completions.create({
+		model: "gpt-3.5-turbo",
+		messages: [
+			{
+				role: "system",
+				content:
+					"You are an expert in data analysis. Return the data in the exact JSON format requested.",
+			},
+			{ role: "user", content: prompt },
+		],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	return completion.choices[0].message.content.trim();
+}
+
+// Function to log the evaluation result to a JSON file
+function logEvaluationResult(position, dailyDate, evaluation) {
+	const logFilePath = path.join(
+		__dirname,
+		"../../data/logs/eval-gptb.logs.json"
+	);
+
+	let logData = [];
+	try {
+		if (fs.existsSync(logFilePath)) {
+			const logFileContents = fs.readFileSync(logFilePath, "utf8");
+			if (logFileContents.trim()) {
+				logData = JSON.parse(logFileContents);
+			}
+		}
+	} catch (error) {
+		if (error.code !== "ENOENT") {
+			throw error;
+		}
+	}
+
+	const newEntry = {
+		position: position + 1,
+		"current day": dailyDate,
+		data: {
+			"predict-evaluation": evaluation,
+		},
+	};
+
+	logData.push(newEntry);
+
+	fs.writeFileSync(logFilePath, JSON.stringify(logData, null, 2), {
+		encoding: "utf8",
+	});
+	console.log(
+		`Evaluation result logged successfully for position ${
+			position + 1
+		}, day ${dailyDate}.`
+	);
+}
+
+// Function to log the structured JSON data into eval.logs.json
+async function logJsonResponse(position, dailyDate, jsonResponse) {
+	const logFilePath = path.join(__dirname, "../../data/logs/eval.logs.json");
+
+	let logData = [];
+	try {
+		if (fs.existsSync(logFilePath)) {
+			const logFileContents = await fs.readFile(logFilePath, "utf8");
+			if (logFileContents.trim()) {
+				logData = JSON.parse(logFileContents);
+			}
+		}
+	} catch (error) {
+		if (error.code !== "ENOENT") {
+			console.error("Error reading JSON log file:", error.message);
+			throw error;
+		}
+	}
+
+	// Ensure jsonResponse is a valid JSON string
+	let parsedJsonResponse;
+	try {
+		parsedJsonResponse = JSON.parse(jsonResponse);
+	} catch (error) {
+		console.error("Failed to parse JSON response:", error.message);
+		throw error;
+	}
+
+	logData.push(parsedJsonResponse);
+
+	try {
+		await fs.writeFile(logFilePath, JSON.stringify(logData, null, 2), {
+			encoding: "utf8",
+		});
+		console.log(
+			`JSON response logged successfully for position ${
+				position + 1
+			}, day ${dailyDate}.`
+		);
+	} catch (error) {
+		console.error("Error writing JSON log file:", error.message);
+		throw error;
+	}
+}
+
+// Main function to handle the process
+async function main(position) {
+	try {
+		const { stockData, predictionData, dailyDate } = fetchData(position);
+
+		const evaluation = await evaluatePrediction(
+			stockData,
+			predictionData,
+			dailyDate
+		);
+
+		logEvaluationResult(position, dailyDate, evaluation);
+
+		const jsonResponse = await generateJsonResponse(
+			position,
+			dailyDate,
+			stockData,
+			predictionData
+		);
+
+		await logJsonResponse(position, dailyDate, jsonResponse);
+	} catch (error) {
+		console.error("Error:", error.message);
+		process.exit(1);
+	}
+}
+
+module.exports = { main };
+
+// const fs = require("fs");
+// const path = require("path");
+// const { OpenAI } = require("openai");
+// require("dotenv").config({
+// 	path: path.resolve(__dirname, "../../config/.env"),
+// });
+
+// // Configuration using GPTB's specific API key from the .env file
+// const openai = new OpenAI({
+// 	apiKey: process.env.GPTB_API_KEY,
+// });
+
+// // Function to load JSON data from a file
+// function loadJsonFile(filePath) {
+// 	return JSON.parse(fs.readFileSync(filePath, "utf8"));
+// }
+
+// // Function to fetch data based on the provided position
+// function fetchData(position) {
+// 	const plannerFilePath = path.join(
+// 		__dirname,
+// 		"../../data/planner/planner.json"
+// 	);
+// 	const plannerData = loadJsonFile(plannerFilePath);
+
+// 	const nextEntry = plannerData.find(
+// 		(entry) => entry.position === position + 1
+// 	);
+
+// 	if (!nextEntry) {
+// 		throw new Error(`No planner data found for position ${position + 1}`);
+// 	}
+
+// 	const dailyDate = nextEntry.daily;
+
+// 	const dailySPYFilePath = path.join(
+// 		__dirname,
+// 		"../../data/stock/daily_SPY.json"
+// 	);
+// 	const dailySPYData = loadJsonFile(dailySPYFilePath);
+
+// 	const stockData = dailySPYData["Time Series (Daily)"][dailyDate];
+
+// 	if (!stockData) {
+// 		throw new Error(`No stock data found for date ${dailyDate}`);
+// 	}
+
+// 	const gptbLogsFilePath = path.join(
+// 		__dirname,
+// 		"../../data/logs/gptb.logs.json"
+// 	);
+// 	const gptbLogsData = loadJsonFile(gptbLogsFilePath);
+
+// 	const currentLogEntry = gptbLogsData.find(
+// 		(entry) => entry.position === position
+// 	);
+
+// 	if (!currentLogEntry) {
+// 		throw new Error(`No GPTB log found for position ${position}`);
+// 	}
+
+// 	const predictionData = currentLogEntry.data.prediction;
+
+// 	return { stockData, predictionData, dailyDate };
+// }
+
+// // Function to make an API call to OpenAI to evaluate the prediction
+// async function evaluatePrediction(stockData, predictionData, dailyDate) {
+// 	const prompt = `You are given a prediction and the actual stock price data for a specific day. Evaluate how accurate the prediction was in terms of the stock price movement (rise or fall), the magnitude of the movement, and any other relevant details.
+
+// Stock Data for ${dailyDate}: ${JSON.stringify(stockData)}
+
+// Prediction: ${predictionData}
+
+// Please provide a detailed analysis comparing the prediction with the actual stock prices. Highlight any aspects where the prediction was accurate, partially accurate, or incorrect. Additionally, discuss the precision of the predicted magnitude of price changes.`;
+
+// 	const completion = await openai.chat.completions.create({
+// 		model: "gpt-3.5-turbo",
+// 		messages: [
+// 			{
+// 				role: "system",
+// 				content: "You are an expert in stock market analysis.",
+// 			},
+// 			{ role: "user", content: prompt },
+// 		],
+// 	});
+
+// 	if (!completion || !completion.choices || completion.choices.length === 0) {
+// 		throw new Error("Invalid response structure from API.");
+// 	}
+
+// 	return completion.choices[0].message.content.trim();
+// }
+
+// // Function to log the evaluation result to a JSON file
+// function logEvaluationResult(position, dailyDate, evaluation) {
+// 	const logFilePath = path.join(
+// 		__dirname,
+// 		"../../data/logs/eval-gptb.logs.json"
+// 	);
+
+// 	let logData = [];
+// 	try {
+// 		if (fs.existsSync(logFilePath)) {
+// 			const logFileContents = fs.readFileSync(logFilePath, "utf8");
+// 			if (logFileContents.trim()) {
+// 				logData = JSON.parse(logFileContents);
+// 			}
+// 		}
+// 	} catch (error) {
+// 		if (error.code !== "ENOENT") {
+// 			throw error;
+// 		}
+// 	}
+
+// 	const newEntry = {
+// 		position: position + 1,
+// 		"current day": dailyDate,
+// 		data: {
+// 			"predict-evaluation": evaluation,
+// 		},
+// 	};
+
+// 	logData.push(newEntry);
+
+// 	fs.writeFileSync(logFilePath, JSON.stringify(logData, null, 2), {
+// 		encoding: "utf8",
+// 	});
+// 	console.log(
+// 		`Evaluation result logged successfully for position ${
+// 			position + 1
+// 		}, day ${dailyDate}.`
+// 	);
+// }
+
+// // Main function to handle the process
+// async function main(position) {
+// 	try {
+// 		const { stockData, predictionData, dailyDate } = fetchData(position);
+
+// 		const evaluation = await evaluatePrediction(
+// 			stockData,
+// 			predictionData,
+// 			dailyDate
+// 		);
+
+// 		logEvaluationResult(position, dailyDate, evaluation);
+// 	} catch (error) {
+// 		console.error("Error:", error.message);
+// 		process.exit(1);
+// 	}
+// }
+
+// module.exports = { main };
+
+
+========================================
+File: ../src/eval_adaptors/eval-gpta.js
+========================================
+
+
+
+========================================
+File: ../src/eval_adaptors/eval-gptd.js
+========================================
+
+
+
+========================================
+File: ../src/news_fetch/__init__.py
+========================================
+
+# File: src/news_fetch/__init__.py
+
+========================================
+File: ../src/news_fetch/news_fetch.py
+========================================
+
+# File: src/news_fetch/news_fetch.py
+
+import requests
+import time
+import json
+from pprint import pprint
+from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+from tqdm import tqdm
+
+# Load environment variables
+load_dotenv(dotenv_path='../../config/.env')
+
+username = os.getenv("USERNAME")
+password = os.getenv("PASSWORD")
+AppID = os.getenv("APP_ID")
+
+
+def get_auth_header(username, password, appid):
+    # Generate the authorization header for making requests to the Aylien API.
+    token_response = requests.post(
+        'https://api.aylien.com/v1/oauth/token',
+        auth=(username, password),
+        data={'grant_type': 'password'}
+    )
+    token_response.raise_for_status()
+    token = token_response.json()['access_token']
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'AppId': appid
+    }
+    return headers
+
+
+def get_stories(params, headers, max_stories=20):
+    # Fetch stories from the Aylien News API using the provided parameters and headers.
+    fetched_stories = []
+    stories = None
+
+    while stories is None or len(stories) > 0:
+        try:
+            response = requests.get('https://api.aylien.com/v6/news/stories', params=params, headers=headers,
+                                    timeout=30)
+            if response.status_code == 200:
+                response_json = response.json()
+                stories = response_json.get('stories', [])
+                fetched_stories.extend(stories)
+                if len(fetched_stories) >= max_stories:
+                    fetched_stories = fetched_stories[:max_stories]
+                    break
+                if 'next_page_cursor' in response_json:
+                    params['cursor'] = response_json['next_page_cursor']
+                else:
+                    break
+                tqdm.write(f"Fetched {len(stories)} stories. Total story count so far: {len(fetched_stories)}")
+            elif response.status_code == 429:
+                tqdm.write("Rate limit reached. Sleeping for 10 seconds.")
+                time.sleep(10)
+            elif 500 <= response.status_code <= 599:
+                tqdm.write(f"Server error {response.status_code}. Sleeping for 260 seconds.")
+                time.sleep(260)
+            else:
+                tqdm.write(response.text)
+                break
+        except requests.exceptions.Timeout:
+            tqdm.write("Request timed out. Retrying...")
+            continue
+        except Exception as e:
+            tqdm.write(str(e))
+            break
+    return fetched_stories
+
+
+def filter_stories(stories):
+    filtered_stories = []
+    for story in stories:
+        # Filter the categories with score 1 in ay.econ or ay.fin
+        filtered_categories = [
+            {"id": category.get("id", ""), "label": category.get("label", ""), "score": category.get("score", "")}
+            for category in story.get("categories", [])
+            if category.get("score") == 1 and category.get("id") in ["ay.econ", "ay.fin"]
+        ]
+
+        # Add the story if it has at least one category with a score of 1 in ay.econ or ay.fin
+        if filtered_categories:
+            filtered_story = {
+                "author": story.get("author", {}),
+                "body": story.get("body", ""),
+                "summary": story.get("summary", {}).get("sentences", []),
+                "title": story.get("title", ""),
+                "source": {
+                    "domain": story.get("source", {}).get("domain", ""),
+                    "home_page_url": story.get("source", {}).get("home_page_url", ""),
+                    "name": story.get("source", {}).get("name", "")
+                },
+                "categories": filtered_categories
+            }
+            filtered_stories.append(filtered_story)
+
+    return filtered_stories
+
+
+def fetch_and_save_news_for_day(date, counter):
+    headers = get_auth_header(username, password, AppID)
+    params = {
+        'published_at': f'[{date}T00:00:00Z TO {date}T23:59:59Z]',
+        'language': 'en',
+        'categories': '{{taxonomy:aylien AND id:(ay.econ OR ay.fin)}}',
+        'source.name': '("The New York Times" OR "The Washington Post" OR "Wall Street Journal" OR "USA Today" OR '
+                       '"Los Angeles Times" OR "The Los Angeles Times" OR "Chicago Tribune" OR "The Chicago Tribune" '
+                       'OR "New York Post" OR "Boston Globe" OR "The Boston Globe" OR "Star Tribune" OR "Newsday"' 
+                       'OR "The Economist" OR "The Financial Times" OR "The Guardian" OR "The Times UK")',
+        'sentiment.title.polarity': '(negative OR neutral OR positive)',
+        'sort_by': 'relevance',
+        'per_page': 100
+    }
+
+    # Fetch stories with a limit of 20 per day
+    stories = get_stories(params, headers, max_stories=20)
+    filtered_stories = filter_stories(stories)
+
+    # Ensure the directory exists
+    os.makedirs('../../data/news', exist_ok=True)
+
+    # Save the filtered stories to a JSON file
+    if filtered_stories:
+        filename = f"../../data/news/{counter}_{date.replace('-', '_')}.json"
+        with open(filename, "w") as file:
+            json.dump(filtered_stories, file, indent=4)
+        tqdm.write(f"Filtered stories saved to {filename}")
+    else:
+        tqdm.write(f"No stories found for {date}")
+
+
+if __name__ == '__main__':
+    start_date = datetime.strptime("2023-01-01", "%Y-%m-%d")
+    end_date = datetime.strptime("2023-12-31", "%Y-%m-%d")
+    total_days = (end_date - start_date).days + 1  # Calculate total number of days to process
+    counter = 1
+
+    with tqdm(total=total_days, desc="Progress", unit="day", ncols=100) as pbar:
+        current_date = start_date
+        while current_date <= end_date:
+            date_str = current_date.strftime("%Y-%m-%d")
+            fetch_and_save_news_for_day(date_str, counter)
+            current_date += timedelta(days=1)
+            counter += 1
+            pbar.update(1)  # Update the progress bar
+
+# import requests
+# import time
+# import json
+# from pprint import pprint
+# from datetime import datetime, timedelta
+# import os
+# from dotenv import load_dotenv
+
+# load_dotenv(dotenv_path='../../config/.env')
+
+# username = os.getenv("USERNAME")
+# password = os.getenv("PASSWORD")
+# AppID = os.getenv("APP_ID")
+
+
+# def get_auth_header(username, password, appid):
+#     # Generate the authorization header for making requests to the Aylien API.
+#     token_response = requests.post(
+#         'https://api.aylien.com/v1/oauth/token',
+#         auth=(username, password),
+#         data={'grant_type': 'password'}
+#     )
+#     token_response.raise_for_status()
+#     token = token_response.json()['access_token']
+#     headers = {
+#         'Authorization': f'Bearer {token}',
+#         'AppId': appid
+#     }
+#     return headers
+
+
+# def get_stories(params, headers, max_stories=10):
+#     # Fetch stories from the Aylien News API using the provided parameters and headers.
+#     fetched_stories = []
+#     stories = None
+
+#     while stories is None or len(stories) > 0:
+#         try:
+#             response = requests.get('https://api.aylien.com/v6/news/stories', params=params, headers=headers,
+#                                     timeout=30)
+#             if response.status_code == 200:
+#                 response_json = response.json()
+#                 stories = response_json.get('stories', [])
+#                 fetched_stories.extend(stories)
+#                 if len(fetched_stories) >= max_stories:
+#                     fetched_stories = fetched_stories[:max_stories]
+#                     break
+#                 if 'next_page_cursor' in response_json:
+#                     params['cursor'] = response_json['next_page_cursor']
+#                 else:
+#                     break
+#                 print(f"Fetched {len(stories)} stories. Total story count so far: {len(fetched_stories)}")
+#             elif response.status_code == 429:
+#                 print("Rate limit reached. Sleeping for 10 seconds.")
+#                 time.sleep(10)
+#             elif 500 <= response.status_code <= 599:
+#                 print(f"Server error {response.status_code}. Sleeping for 260 seconds.")
+#                 time.sleep(260)
+#             else:
+#                 pprint(response.text)
+#                 break
+#         except requests.exceptions.Timeout:
+#             print("Request timed out. Retrying...")
+#             continue
+#         except Exception as e:
+#             print(e)
+#             break
+#     return fetched_stories
+
+
+# def filter_stories(stories):
+#     filtered_stories = []
+#     for story in stories:
+#         # Keep the basic fields
+#         filtered_story = {
+#             "author": story.get("author", {}),
+#             "body": story.get("body", ""),
+#             "summary": story.get("summary", {}).get("sentences", []),
+#             "title": story.get("title", ""),
+#             "source": {
+#                 "domain": story.get("source", {}).get("domain", ""),
+#                 "home_page_url": story.get("source", {}).get("home_page_url", ""),
+#                 "name": story.get("source", {}).get("name", "")
+#             }
+#         }
+
+#         # Filter the categories
+#         filtered_categories = [
+#             {"id": category.get("id", ""), "label": category.get("label", ""), "score": category.get("score", "")}
+#             for category in story.get("categories", [])
+#             if category.get("id") == "ay.impact"
+#         ]
+
+#         # Add categories if the filtered list is not empty
+#         if filtered_categories:
+#             filtered_story["categories"] = filtered_categories
+
+#         filtered_stories.append(filtered_story)
+
+#     return filtered_stories
+
+
+# def fetch_and_save_news_for_day(date, counter):
+#     headers = get_auth_header(username, password, AppID)
+#     params = {
+#         'published_at': f'[{date}T00:00:00Z TO {date}T23:59:59Z]',
+#         'language': 'en',
+#         'categories': '{{taxonomy:aylien AND id:(ay.fin OR ay.impact) AND score:1}}',
+#         'source.name': '("Yahoo Finance" OR "Nasdaq" OR "Washingtonpost.com" OR "New York Times, The" OR "Wall Street Journal")',
+#         'sentiment.title.polarity': '(negative OR neutral OR positive)',
+#         'sort_by': 'relevance',
+#         'per_page': 100
+#     }
+
+#     # Fetch stories with a limit of 10 per day
+#     stories = get_stories(params, headers, max_stories=10)
+#     filtered_stories = filter_stories(stories)
+
+#     # Ensure the directory exists
+#     os.makedirs('../../data/news', exist_ok=True)
+
+#     # Save the filtered stories to a JSON file
+#     if filtered_stories:
+#         filename = f"../../data/news/{counter}_{date.replace('-', '_')}.json"
+#         with open(filename, "w") as file:
+#             json.dump(filtered_stories, file, indent=4)
+#         print(f"Filtered stories saved to {filename}")
+#     else:
+#         print(f"No stories found for {date}")
+
+
+# if __name__ == '__main__':
+#     start_date = datetime.strptime("2022-05-17", "%Y-%m-%d")
+#     end_date = datetime.strptime("2022-07-31", "%Y-%m-%d")
+#     current_date = start_date
+#     counter = 1
+
+#     while current_date <= end_date:
+#         date_str = current_date.strftime("%Y-%m-%d")
+#         fetch_and_save_news_for_day(date_str, counter)
+#         current_date += timedelta(days=1)
+#         counter += 1
+
+========================================
+File: ../src/planner/execute.js
+========================================
+
+// File: src/planner/execute.js
+
+const { createPlanner } = require("./index");
+
+async function runPlanner() {
+	try {
+		console.log("Starting planner execution...");
+		await createPlanner();
+		console.log("Planner execution completed successfully.");
+	} catch (error) {
+		console.error("Error executing planner:", error);
+	}
+}
+
+// Execute the planner
+runPlanner();
+
+
+========================================
+File: ../src/planner/index.js
+========================================
+
+// File: src/planner/index.js
+
+const fs = require("fs").promises;
+const path = require("path");
+require("dotenv").config();
+
+// Define paths to the JSON files using environment variables
+const dailyPath = path.join(__dirname, "../../data/stock/daily_SPY.json");
+const weeklyPath = path.join(__dirname, "../../data/stock/weekly_SPY.json");
+const monthlyPath = path.join(__dirname, "../../data/stock/monthly_SPY.json");
+const newsPath = path.join(__dirname, "../../data/news/news.json");
+const plannerPath = path.join(__dirname, "../../data/planner/planner.json");
+
+async function readJSON(filePath) {
+	try {
+		console.log(`Reading JSON file from path: ${filePath}`);
+		const data = await fs.readFile(filePath, "utf8");
+		console.log(`Successfully read JSON file from path: ${filePath}`);
+		return JSON.parse(data);
+	} catch (error) {
+		console.error(`Error reading JSON file from path: ${filePath}`, error);
+		throw error;
+	}
+}
+
+function formatDate(dateStr) {
+	const [year, month, day] = dateStr.split("-");
+	return `${year}-${month}-${day}`;
+}
+
+async function createPlanner() {
+	try {
+		console.log("Starting to create planner...");
+
+		const dailyData = await readJSON(dailyPath);
+		const weeklyData = await readJSON(weeklyPath);
+		const monthlyData = await readJSON(monthlyPath);
+		const newsData = await readJSON(newsPath);
+
+		const dailySeries = dailyData["Time Series (Daily)"];
+		const weeklySeries = weeklyData["Weekly Time Series"];
+		const monthlySeries = monthlyData["Monthly Time Series"];
+
+		const planner = [];
+		let lastNewsDate = null;
+
+		const newsEntriesArray = Object.entries(newsData);
+
+		for (const [dailyKey, dailyValue] of Object.entries(dailySeries)) {
+			console.log(`Processing daily entry: ${dailyKey}`);
+			const position = dailyKey.split("_")[0];
+			const dailyDate = dailyKey.split("_")[1];
+			const formattedDate = formatDate(dailyDate);
+			const entry = { position: parseInt(position), daily: dailyKey };
+
+			// Include weekly data if it matches the daily date
+			const weeklyKey = Object.keys(weeklySeries).find(
+				(key) => key.split("_")[1] === dailyDate
+			);
+			if (weeklyKey) {
+				entry.weekly = weeklyKey;
+				console.log(`Including weekly entry: ${weeklyKey}`);
+			}
+
+			// Include monthly data if it matches the daily date
+			const monthlyKey = Object.keys(monthlySeries).find(
+				(key) => key.split("_")[1] === dailyDate
+			);
+			if (monthlyKey) {
+				entry.monthly = monthlyKey;
+				console.log(`Including monthly entry: ${monthlyKey}`);
+			}
+
+			// Include news data up to the current daily date
+			const newsEntries = [];
+			for (const [newsKey, newsValue] of newsEntriesArray) {
+				const newsDate = newsKey.split("_").slice(1).join("-");
+				const formattedNewsDate = formatDate(newsDate);
+				if (
+					(lastNewsDate === null ||
+						new Date(formattedNewsDate) > new Date(lastNewsDate)) &&
+					new Date(formattedNewsDate) <= new Date(formattedDate)
+				) {
+					newsEntries.push(newsKey);
+				}
+			}
+			entry.news = newsEntries.join(", ");
+			console.log(`Including news entries: ${entry.news}`);
+
+			// Update lastNewsDate to the latest included news date
+			if (newsEntries.length > 0) {
+				lastNewsDate = newsEntries[newsEntries.length - 1]
+					.split("_")
+					.slice(1)
+					.join("-");
+			}
+
+			planner.push(entry);
+		}
+
+		await fs.writeFile(
+			plannerPath,
+			JSON.stringify(planner, null, 2),
+			"utf8"
+		);
+		console.log("Planner JSON file created successfully");
+	} catch (error) {
+		console.error("Error creating planner:", error);
+		throw error;
+	}
+}
+
+// Export the createPlanner function
+module.exports = { createPlanner };
+
+// Run the createPlanner function
+createPlanner().catch((error) => {
+	console.error("Error creating planner:", error);
+});
+
+
+========================================
+File: ../src/stock_fetch/__init__.py
+========================================
+
+# File: src/stock_fetch/__init__.py
+
+========================================
+File: ../src/stock_fetch/stock_fetch.py
+========================================
+
+# File: src/stock_fetch/stock_fetch.py
+
+import requests
+import json
+import os
+from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path='../../config/.env')
+
+# Replace with your Alpha Vantage API key
+API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
+BASE_URL = os.getenv('ALPHA_VANTAGE_BASE_URL')
+
+# Function to fetch data from Alpha Vantage API
+def fetch_data(function, symbol='SPY', outputsize='compact', interval=None):
+    params = {
+        'function': function,
+        'symbol': symbol,
+        'apikey': API_KEY,
+        'outputsize': outputsize
+    }
+    if interval:
+        params['interval'] = interval
+
+    response = requests.get(BASE_URL, params=params)
+    data = response.json()
+    
+    if "Error Message" in data:
+        raise ValueError(f"Error fetching data: {data['Error Message']}")
+    if "Note" in data:
+        raise ValueError(f"Note from API: {data['Note']}")
+    if "Information" in data:
+        raise ValueError(f"Information from API: {data['Information']}")
+    return data
+
+# Function to filter data by date range
+def filter_data_by_date(data, start_date, end_date, key):
+    if key not in data:
+        raise ValueError(f"Key '{key}' not found in data")
+    
+    filtered_data = {key: {}}
+    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+    end_date = datetime.strptime(end_date, '%Y-%m-%d')
+
+    for date_str, values in data[key].items():
+        date = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S' if ' ' in date_str else '%Y-%m-%d')
+        if start_date <= date < end_date:  # Changed <= to < for end_date consistency
+            filtered_data[key][date_str] = values
+    
+    return filtered_data
+
+# Function to save data to a JSON file
+def save_data(data, filename):
+    os.makedirs('data/stock', exist_ok=True)
+    filepath = os.path.join('data/stock', filename)
+    with open(filepath, 'w') as file:
+        json.dump(data, file, indent=4)
+    print(f"Data saved to {filepath}")
+
+# Fetch and save daily data
+def fetch_and_save_daily(symbol='SPY', start_date='2023-01-01', end_date='2024-03-11'):
+    data = fetch_data('TIME_SERIES_DAILY', symbol, outputsize='full')
+    print(f"Fetched daily data: {list(data.keys())}")  # Debug statement
+    filtered_data = filter_data_by_date(data, start_date, end_date, 'Time Series (Daily)')
+    print(f"Filtered data for range {start_date} to {end_date}: {json.dumps(filtered_data, indent=4)[:500]}")  # Debug statement
+    save_data(filtered_data, f'daily_{symbol}.json')
+
+# Fetch and save weekly data
+def fetch_and_save_weekly(symbol='SPY', start_date='2023-01-02', end_date='2024-07-14'):
+    data = fetch_data('TIME_SERIES_WEEKLY', symbol, outputsize='full')
+    print(f"Fetched weekly data: {list(data.keys())}")  # Debug statement
+    filtered_data = filter_data_by_date(data, start_date, end_date, 'Weekly Time Series')
+    save_data(filtered_data, f'weekly_{symbol}.json')
+
+# Fetch and save monthly data
+def fetch_and_save_monthly(symbol='SPY', start_date='2023-01-02', end_date='2024-07-14'):
+    data = fetch_data('TIME_SERIES_MONTHLY', symbol, outputsize='full')
+    print(f"Fetched monthly data: {list(data.keys())}")  # Debug statement
+    filtered_data = filter_data_by_date(data, start_date, end_date, 'Monthly Time Series')
+    save_data(filtered_data, f'monthly_{symbol}.json')
+
+if __name__ == '__main__':
+    symbol = 'SPY'  # S&P 500 ETF as a proxy
+    start_date = '2023-01-02'
+    end_date = '2024-07-14'
+    try:
+        fetch_and_save_daily(symbol, start_date, end_date)
+        fetch_and_save_weekly(symbol, start_date, end_date)
+        fetch_and_save_monthly(symbol, start_date, end_date)
+        print("Data fetching completed successfully.")
+    except ValueError as e:
+        print(e)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+========================================
 File: ./scripts/combine_code_script.py
 ========================================
 
@@ -986,12 +2187,13 @@ import os
 
 # Define the directories and file extensions to include
 directories_to_include = [
-    # "../scripts",
+    "../scripts",
     "../src/orchestration",
     "../src/adaptors",
-    # "../src/news_fetch",
-    # "../src/planner",
-    # "../src/stock_fetch"
+    "../src/eval_adaptors",
+    "../src/news_fetch",
+    "../src/planner",
+    "../src/stock_fetch"
 ]
 extensions_to_include = ['.py', '.js']
 

@@ -18,7 +18,7 @@ const readJSONData = async (filePath) => {
 		const dataJson = await fs.readFile(filePath, { encoding: "utf8" });
 		return JSON.parse(dataJson);
 	} catch (error) {
-		console.error(`Error reading JSON file: ${filePath}`, error); // Use backticks here
+		console.error(`Error reading JSON file: ${filePath}`, error);
 		throw error;
 	}
 };
@@ -71,7 +71,7 @@ const logDataToFile = async (filePath, position, currentDay, newData) => {
 
 	// Convert the absolute path to a relative path for logging
 	const relativePath = path.relative(process.cwd(), filePath);
-	console.log(`Data logged successfully to ${relativePath}.`); // Use backticks here
+	console.log(`Data logged successfully to ${relativePath}.`);
 };
 
 // Function to fetch prediction data from logs
@@ -80,7 +80,7 @@ const fetchPredictionData = async (position, filePath) => {
 	const entry = logData.find((item) => item.position === position);
 	if (!entry) {
 		throw new Error(
-			`No entry found for position ${position} in ${filePath}` // Use backticks here
+			`No entry found for position ${position} in ${filePath}`
 		);
 	}
 	return entry.data.prediction;
@@ -107,7 +107,7 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 			gptcLogsPath
 		);
 
-		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${currentDay}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${gptbPrediction}, Predictions from GPTC: ${gptcPrediction}.`; // Use backticks here
+		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${currentDay}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${gptbPrediction}, Predictions from GPTC: ${gptcPrediction}.`;
 
 		const completion = await openai.chat.completions.create({
 			model: "gpt-3.5-turbo",
@@ -160,7 +160,6 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 };
 
 // Function to make a final prediction for the next trading day stock prices
-// Function to make a final prediction for the next trading day stock prices
 const makeFinalPrediction = async (position, currentDay) => {
 	try {
 		const gptdLogsPath = path.resolve(
@@ -182,10 +181,13 @@ const makeFinalPrediction = async (position, currentDay) => {
 		const analysisData = entry.data.analysis;
 		const nextDay = `day${parseInt(currentDay.replace("day", "")) + 1}`;
 
-		const prompt = `Based on the integrated analysis from Day ${currentDay}, synthesize insights to make a final, comprehensive prediction for ${nextDay} stock prices. Your prediction should clearly state whether stock prices are expected to rise or fall, by how much, and the reasoning behind your forecast. Ensure the prediction is quantitative, specifying the expected percentage change or price range. Consider historical trends, recent market behaviour, and any notable anomalies in the data. Ensure that the prediction is quantitative and precise, with a clear percentage and a solid reasoning behind the forecast. The prediction must be actionable and suitable for further validation and fine-tuning.
+		const prompt = `Based on the integrated analysis from Day ${currentDay}, synthesize insights to make a final, comprehensive prediction for ${nextDay} stock prices. Your prediction should clearly state whether stock prices are expected to rise or fall, by how much, and the reasoning behind your forecast. Ensure the prediction is quantitative, specifying the expected percentage change or price range. Additionally, express the confidence level of this prediction as a percentage (0-100%).
 
-Prediction: Raise or Fall?
-How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Prediction:
+- Direction: Raise or Fall?
+- Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+- Confidence: Express the confidence level of this prediction as a percentage (0-100%).
+
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Analysis data: ${analysisData}.`;
 
 		const completion = await openai.chat.completions.create({
@@ -194,7 +196,7 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 				{
 					role: "system",
 					content:
-						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, enabling validation against actual market outcomes.",
+						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, including a confidence level, to enable validation against actual market outcomes.",
 				},
 				{
 					role: "user",
@@ -229,7 +231,7 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 // Main GPTD function to integrate analysis and make predictions
 const gptd = async (position) => {
 	try {
-		console.log(`Starting GPTD processing for position ${position}...`); // Use backticks here
+		console.log(`Starting GPTD processing for position ${position}...`);
 
 		// Load the planner file and get the corresponding daily entry for the position
 		const plannerPath = path.resolve(
@@ -240,7 +242,7 @@ const gptd = async (position) => {
 		const entry = plannerData.find((item) => item.position === position);
 
 		if (!entry || !entry.daily) {
-			throw new Error(`No daily entry found for position ${position}`); // Use backticks here
+			throw new Error(`No daily entry found for position ${position}`);
 		}
 
 		const currentDay = entry.daily;
@@ -251,9 +253,9 @@ const gptd = async (position) => {
 		// Make final prediction for the next trading day stock prices
 		await makeFinalPrediction(position, currentDay);
 
-		console.log(`GPTD processing completed for position ${position}.`); // Use backticks here
+		console.log(`GPTD processing completed for position ${position}.`);
 	} catch (error) {
-		console.error(`Error in GPTD for position ${position}:`, error); // Use backticks here
+		console.error(`Error in GPTD for position ${position}:`, error);
 		throw error;
 	}
 };

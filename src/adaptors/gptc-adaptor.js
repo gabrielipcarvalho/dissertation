@@ -35,8 +35,11 @@ const readStockPriceData = async (day) => {
 const analyzeStockPricesWithGPT = async (stockPrices, currentDay) => {
 	const prompt = `Analyze the following stock price data for trends and patterns, and make a concrete prediction for the next trading day. Clearly state whether stock prices are expected to rise or fall, and specify the expected percentage change or price range. Your prediction must be quantitative and actionable, enabling validation against actual market outcomes and also enabling fine-tuning. Consider historical trends, market behavior, and any notable anomalies in the data.
 
-Prediction: Raise or Fall ?
-How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Prediction:
+- Direction: Raise or Fall?
+- Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+- Confidence: Express the confidence level of this prediction as a percentage (0-100%).
+
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
 
 The stock price data to analyze is: ${JSON.stringify(stockPrices)}`;
@@ -48,7 +51,7 @@ The stock price data to analyze is: ${JSON.stringify(stockPrices)}`;
 				{
 					role: "system",
 					content:
-						"You are a financial analyst. Your task is to analyze the provided stock price data and make a concrete prediction about future stock price movements. Your prediction must be clear, quantitative, and actionable.",
+						"You are a financial analyst. Your task is to analyze the provided stock price data and make a concrete prediction about future stock price movements. Your prediction must be clear, quantitative, actionable, and include a confidence level.",
 				},
 				{ role: "user", content: prompt },
 			],

@@ -171,11 +171,14 @@ const predictStockPrices = async (analysis, currentDay) => {
 
 	const prompt = `Using the analysis of sentiment impact and market sentiment from ${currentDay}, forecast the stock prices for ${nextDay}. Please provide the prediction in the following format:
 
-Prediction: Raise or Fall ?
-How Much: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+Prediction:
+- Direction: Raise or Fall?
+- Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
+- Confidence: Express the confidence level of this prediction as a percentage (0-100%).
+
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
 
-Ensure that the prediction is quantitative and precise, with a clear percentage change and a solid reasoning behind the forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
+Ensure that the prediction is quantitative, precise, and includes a clear confidence level that reflects how certain the model is in its forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
 
 	const completion = await openai.chat.completions.create({
 		model: "gpt-3.5-turbo",
