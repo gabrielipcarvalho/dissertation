@@ -134,8 +134,8 @@ def fetch_and_save_news_for_day(date, counter):
 
 
 if __name__ == '__main__':
-    start_date = datetime.strptime("2023-01-01", "%Y-%m-%d")
-    end_date = datetime.strptime("2023-12-31", "%Y-%m-%d")
+    start_date = datetime.strptime("2022-05-30", "%Y-%m-%d")
+    end_date = datetime.strptime("2024-08-12", "%Y-%m-%d")
     total_days = (end_date - start_date).days + 1  # Calculate total number of days to process
     counter = 1
 

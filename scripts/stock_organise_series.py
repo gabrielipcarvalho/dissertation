@@ -4,8 +4,8 @@ import json
 
 # Constants for the JSON data keys and paths
 DATA_TIME_SERIES = "Monthly Time Series"
-PATH_SOURCE = "./data/stock/monthly_SPY.json"
-PATH_OUTPUT = "./data/stock/reverse_monthly_SPY.json"
+PATH_SOURCE = "../data/stock/monthly_SPY.json"
+PATH_OUTPUT = "../data/stock/reverse_monthly_SPY.json"
 
 # Load the JSON data from a file
 with open(PATH_SOURCE, 'r') as file:

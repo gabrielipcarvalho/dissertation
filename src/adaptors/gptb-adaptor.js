@@ -101,7 +101,7 @@ Provide a detailed and structured analysis, incorporating quantitative and quali
 	});
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: "gpt-4o",
 		messages: [
 			{ role: "system", content: prompt },
 			{ role: "user", content: combinedData },
@@ -181,7 +181,7 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 Ensure that the prediction is quantitative, precise, and includes a clear confidence level that reflects how certain the model is in its forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: "gpt-4o",
 		messages: [
 			{ role: "system", content: prompt },
 			{ role: "user", content: analysis },

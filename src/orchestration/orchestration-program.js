@@ -16,6 +16,8 @@ const {
 const path = require("path");
 
 const { main: evalGptb } = require("../eval_adaptors/eval-gptb");
+const { main: evalGptc } = require("../eval_adaptors/eval-gptc");
+const { main: evalGptd } = require("../eval_adaptors/eval-gptd");
 
 require("dotenv").config({ path: "../../config/.env" });
 
@@ -46,6 +48,12 @@ const orchestrateAdaptors = async () => {
 
 			// Step 5: eval-gptb() evaluates the predictions made by GPTB
 			await evalGptb(position);
+
+			// Step 6: eval-gptc() evaluates the predictions made by GPTC
+			await evalGptc(position);
+
+			// Step 7: eval-gptd() evaluates the predictions made by GPTD
+			await evalGptd(position);
 
 			console.log(
 				`Orchestration completed for position ${position}, day ${daily}`

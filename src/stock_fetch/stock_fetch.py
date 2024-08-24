@@ -52,14 +52,14 @@ def filter_data_by_date(data, start_date, end_date, key):
 
 # Function to save data to a JSON file
 def save_data(data, filename):
-    os.makedirs('data/stock', exist_ok=True)
-    filepath = os.path.join('data/stock', filename)
+    os.makedirs('../../data/stock', exist_ok=True)
+    filepath = os.path.join('../../data/stock', filename)
     with open(filepath, 'w') as file:
         json.dump(data, file, indent=4)
     print(f"Data saved to {filepath}")
 
 # Fetch and save daily data
-def fetch_and_save_daily(symbol='SPY', start_date='2023-01-01', end_date='2024-03-11'):
+def fetch_and_save_daily(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
     data = fetch_data('TIME_SERIES_DAILY', symbol, outputsize='full')
     print(f"Fetched daily data: {list(data.keys())}")  # Debug statement
     filtered_data = filter_data_by_date(data, start_date, end_date, 'Time Series (Daily)')
@@ -67,14 +67,14 @@ def fetch_and_save_daily(symbol='SPY', start_date='2023-01-01', end_date='2024-0
     save_data(filtered_data, f'daily_{symbol}.json')
 
 # Fetch and save weekly data
-def fetch_and_save_weekly(symbol='SPY', start_date='2023-01-02', end_date='2024-07-14'):
+def fetch_and_save_weekly(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
     data = fetch_data('TIME_SERIES_WEEKLY', symbol, outputsize='full')
     print(f"Fetched weekly data: {list(data.keys())}")  # Debug statement
     filtered_data = filter_data_by_date(data, start_date, end_date, 'Weekly Time Series')
     save_data(filtered_data, f'weekly_{symbol}.json')
 
 # Fetch and save monthly data
-def fetch_and_save_monthly(symbol='SPY', start_date='2023-01-02', end_date='2024-07-14'):
+def fetch_and_save_monthly(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
     data = fetch_data('TIME_SERIES_MONTHLY', symbol, outputsize='full')
     print(f"Fetched monthly data: {list(data.keys())}")  # Debug statement
     filtered_data = filter_data_by_date(data, start_date, end_date, 'Monthly Time Series')
@@ -82,8 +82,8 @@ def fetch_and_save_monthly(symbol='SPY', start_date='2023-01-02', end_date='2024
 
 if __name__ == '__main__':
     symbol = 'SPY'  # S&P 500 ETF as a proxy
-    start_date = '2023-01-02'
-    end_date = '2024-07-14'
+    start_date = '2022-05-30'
+    end_date = '2024-08-12'
     try:
         fetch_and_save_daily(symbol, start_date, end_date)
         fetch_and_save_weekly(symbol, start_date, end_date)

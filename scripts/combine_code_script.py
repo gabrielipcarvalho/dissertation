@@ -4,13 +4,13 @@ import os
 
 # Define the directories and file extensions to include
 directories_to_include = [
-    "../scripts",
+    # "../scripts",
     "../src/orchestration",
     "../src/adaptors",
     "../src/eval_adaptors",
-    "../src/news_fetch",
-    "../src/planner",
-    "../src/stock_fetch"
+    # "../src/news_fetch",
+    # "../src/planner",
+    # "../src/stock_fetch"
 ]
 extensions_to_include = ['.py', '.js']
 
