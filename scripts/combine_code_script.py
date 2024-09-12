@@ -8,9 +8,11 @@ directories_to_include = [
     "../src/orchestration",
     "../src/adaptors",
     "../src/eval_adaptors",
+    "../src/fine_tuning"
     # "../src/news_fetch",
     # "../src/planner",
-    # "../src/stock_fetch"
+    # "../src/stock_fetch",
+    # "../src/metrics"
 ]
 extensions_to_include = ['.py', '.js']
 

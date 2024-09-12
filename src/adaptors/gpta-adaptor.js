@@ -53,16 +53,19 @@ const fetchNewsData = async (newsId) => {
 };
 
 // Function to extract key information using GPT
-const extractKeyInformation = async (newsData) => {
-	console.log("Extracting key information from news data...");
+const extractKeyInformation = async (newsData, modelName) => {
+	// Accept modelName as a parameter
+	console.log(
+		`Extracting key information from news data using model ${modelName}...`
+	);
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-4o",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{
 				role: "system",
 				content:
-					"Please analyse the following text and extract key information that could significantly impact stock market trends. Focus on identifying critical details related to corporate earnings, economic announcements, geopolitical events, market forecasts, and other influential factors. Ensure the summary is concise and highlights the potential market implications of each identified element.",
+					"You are an AI model tasked with extracting key information from the provided news text that could significantly impact stock prices for companies in the S&P 500 index. Focus on identifying specific details related to corporate earnings, economic data, market forecasts, and geopolitical events. Each identified piece of information should be directly linked to its potential impact on the stock market. Keep the extraction focused and concise, ensuring the final output is within 1500 characters.",
 			},
 			{
 				role: "user",
@@ -82,15 +85,18 @@ const extractKeyInformation = async (newsData) => {
 };
 
 // Function to perform sentiment analysis using GPT
-const performSentimentAnalysis = async (keyInformation) => {
-	console.log("Performing sentiment analysis on key information...");
+const performSentimentAnalysis = async (keyInformation, modelName) => {
+	// Accept modelName as a parameter
+	console.log(
+		`Performing sentiment analysis on key information using model ${modelName}...`
+	);
 	const completion = await openai.chat.completions.create({
-		model: "gpt-4o",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{
 				role: "system",
 				content:
-					"Utilise the provided information to perform a comprehensive sentiment analysis, determining the overall sentiment (positive, negative, or neutral) and its intensity. Focus on how this sentiment might affect stock market trends, considering the potential impact on market movements, investor behaviour, and future market forecasts. Provide a detailed explanation of your analysis and its implications for stock market trends.",
+					"You are an AI model performing sentiment analysis on the extracted key information from financial news. For each identified section, evaluate the sentiment as Very Negative, Negative, Neutral, Positive, or Very Positive based on its potential impact on the S&P 500 stock prices. Very Negative indicates a high likelihood of decreasing the index, while Very Positive indicates a high likelihood of increasing it. After evaluating each section, calculate an overall sentiment for the entire news piece. Ensure your analysis is within 1500 characters.",
 			},
 			{
 				role: "user",
@@ -168,17 +174,24 @@ const logResults = async (
 };
 
 // Main GPTA function
-const gpta = async (position) => {
+const gpta = async (position, modelName) => {
+	// Accept modelName as a parameter
 	try {
-		console.log(`Starting GPTA processing for position ${position}...`);
+		console.log(
+			`Starting GPTA processing for position ${position} using model ${modelName}...`
+		);
 		const newsIds = await getNewsForPosition(position);
 
 		for (const newsId of newsIds) {
 			const newsData = await fetchNewsData(newsId);
-			const keyInformation = await extractKeyInformation(newsData);
+			const keyInformation = await extractKeyInformation(
+				newsData,
+				modelName
+			); // Pass modelName
 			const sentimentAnalysis = await performSentimentAnalysis(
-				keyInformation
-			);
+				keyInformation,
+				modelName
+			); // Pass modelName
 
 			await logResults(
 				position,
@@ -187,7 +200,7 @@ const gpta = async (position) => {
 				sentimentAnalysis
 			);
 			console.log(
-				`GPTA processed news for ${newsId} at position ${position}`
+				`GPTA processed news for ${newsId} at position ${position} using model ${modelName}`
 			);
 		}
 

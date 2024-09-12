@@ -3,9 +3,9 @@
 import json
 
 # Constants for the JSON data keys and paths
-DATA_TIME_SERIES = "Monthly Time Series"
-PATH_SOURCE = "../data/stock/monthly_SPY.json"
-PATH_OUTPUT = "../data/stock/reverse_monthly_SPY.json"
+DATA_TIME_SERIES = "Time Series (Daily)"
+PATH_SOURCE = "../data/stock/daily_SPY.json"
+PATH_OUTPUT = "../data/stock/reverse_daily_SPY.json"
 
 # Load the JSON data from a file
 with open(PATH_SOURCE, 'r') as file:
@@ -15,7 +15,7 @@ with open(PATH_SOURCE, 'r') as file:
 time_series = data[DATA_TIME_SERIES]
 
 # Reverse the order of the time series
-reversed_time_series = dict(reversed(list(time_series.items())))
+reversed_time_series = dict(list(time_series.items())) # dict(reversed(list(time_series.items())))
 
 # Add a counter to each date
 counter = 1

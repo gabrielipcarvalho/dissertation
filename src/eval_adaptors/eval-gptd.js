@@ -1,3 +1,5 @@
+// src/eval_adaptors/eval-gptd.js
+
 const fs = require("fs/promises");
 const path = require("path");
 const { OpenAI } = require("openai");
@@ -70,7 +72,12 @@ async function fetchData(position) {
 }
 
 // Function to make an API call to OpenAI to evaluate the prediction
-async function evaluatePrediction(stockData, predictionData, dailyDate) {
+async function evaluatePrediction(
+	stockData,
+	predictionData,
+	dailyDate,
+	modelName
+) {
 	const prompt = `You are an expert in stock market analysis. Given the following prediction and actual stock price data for the specified day, please evaluate how accurate the prediction was. Compare the direction of the movement (rise or fall) and the magnitude of the movement (percentage change). Highlight any areas where the prediction was accurate, partially accurate, or incorrect.
 
 Stock Data for ${dailyDate}:
@@ -79,11 +86,11 @@ Amount: ${stockData["7. amount"]}
 
 Prediction: ${predictionData}
 
-Please provide a detailed analysis comparing the prediction with the actual stock prices.`;
+Please provide a detailed analysis comparing the prediction with the actual stock prices (make sure the response is within 1500 characters).`;
 
 	console.log(`Sending API request for prediction evaluation.`);
 	const completion = await openai.chat.completions.create({
-		model: "gpt-4o",
+		model: modelName,
 		messages: [
 			{
 				role: "system",
@@ -101,7 +108,7 @@ Please provide a detailed analysis comparing the prediction with the actual stoc
 }
 
 // Function to make a second API call to generate structured JSON-like data
-async function generateJsonResponse(predictionData) {
+async function generateJsonResponse(predictionData, modelName) {
 	const prompt = `You are an expert in data analysis, tasked with extracting specific information from a text-based prediction.
 
 Prediction: ${predictionData}
@@ -119,6 +126,8 @@ Prediction: ${predictionData}
    - **No Additional Text**: Do not include any explanations, introductions, or formatting like markdown.
    - The output must be valid JSON that can be parsed directly.
 
+Make sure the response is within 1500 characters.
+
 Below is the JSON structure to fill:
 
 {
@@ -132,7 +141,7 @@ Below is the JSON structure to fill:
 
 	console.log(`Sending API request for structured JSON response.`);
 	const completion = await openai.chat.completions.create({
-		model: "gpt-4o",
+		model: modelName,
 		messages: [{ role: "user", content: prompt }],
 	});
 
@@ -268,7 +277,7 @@ async function logJsonResponse(position, dailyDate, jsonResponse) {
 }
 
 // Main function to handle the process
-async function main(position) {
+async function main(position, modelName) {
 	console.log(`Starting main process for position ${position}`);
 	try {
 		// Step 2: Fetch the stock data, prediction data, and daily date
@@ -280,12 +289,16 @@ async function main(position) {
 		const evaluation = await evaluatePrediction(
 			stockData,
 			predictionData,
-			dailyDate
+			dailyDate,
+			modelName
 		);
 		await logEvaluationResult(position, dailyDate, evaluation);
 
 		// Step 7: Generate the JSON-like structure from the prediction data
-		const gptdResponse = await generateJsonResponse(predictionData);
+		const gptdResponse = await generateJsonResponse(
+			predictionData,
+			modelName
+		);
 		console.log(gptdResponse);
 
 		// Step 8: Complete the JSON with the relevant position, date, and outcome

@@ -87,7 +87,12 @@ const fetchPredictionData = async (position, filePath) => {
 };
 
 // Function to integrate and analyze predictions from GPTB and GPTC
-const integrateAndAnalyzePredictions = async (position, currentDay) => {
+const integrateAndAnalyzePredictions = async (
+	position,
+	currentDay,
+	modelName
+) => {
+	// Added modelName parameter
 	try {
 		const gptbLogsPath = path.resolve(
 			__dirname,
@@ -110,12 +115,12 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${currentDay}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${gptbPrediction}, Predictions from GPTC: ${gptcPrediction}.`;
 
 		const completion = await openai.chat.completions.create({
-			model: "gpt-4o",
+			model: modelName, // Use dynamic model name here
 			messages: [
 				{
 					role: "system",
 					content:
-						"Synthesize the information from GPTB and GPTC models to provide a cohesive analysis. Your analysis should integrate insights from both models, highlighting areas of agreement and divergence, and explain the implications for stock price movements. Ensure the analysis is detailed and includes quantitative assessments where possible.",
+						"Synthesize the information from GPTB and GPTC models to provide a cohesive analysis. Your analysis should integrate insights from both models, highlighting areas of agreement and divergence, and explain the implications for stock price movements. Ensure the analysis is detailed and includes quantitative assessments where possible. Make sure your response is within 1500 characters.",
 				},
 				{
 					role: "user",
@@ -160,7 +165,8 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 };
 
 // Function to make a final prediction for the next trading day stock prices
-const makeFinalPrediction = async (position, currentDay) => {
+const makeFinalPrediction = async (position, currentDay, modelName) => {
+	// Added modelName parameter
 	try {
 		const gptdLogsPath = path.resolve(
 			__dirname,
@@ -188,15 +194,15 @@ Prediction:
 - Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
 - Confidence: Express the confidence level of this prediction as a percentage (0-100%).
 
-Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Analysis data: ${analysisData}.`;
+Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Make sure your response is within 1500 characters. Analysis data: ${analysisData}.`;
 
 		const completion = await openai.chat.completions.create({
-			model: "gpt-4o",
+			model: modelName, // Use dynamic model name here
 			messages: [
 				{
 					role: "system",
 					content:
-						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, including a confidence level, to enable validation against actual market outcomes.",
+						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, including a confidence level, to enable validation against actual market outcomes. Make sure the response is within 1500 characters.",
 				},
 				{
 					role: "user",
@@ -229,9 +235,12 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 };
 
 // Main GPTD function to integrate analysis and make predictions
-const gptd = async (position) => {
+const gptd = async (position, modelName) => {
+	// Accept modelName as parameter
 	try {
-		console.log(`Starting GPTD processing for position ${position}...`);
+		console.log(
+			`Starting GPTD processing for position ${position} using model ${modelName}...`
+		);
 
 		// Load the planner file and get the corresponding daily entry for the position
 		const plannerPath = path.resolve(
@@ -248,10 +257,10 @@ const gptd = async (position) => {
 		const currentDay = entry.daily;
 
 		// Integrate and analyze predictions from GPTB and GPTC
-		await integrateAndAnalyzePredictions(position, currentDay);
+		await integrateAndAnalyzePredictions(position, currentDay, modelName);
 
 		// Make final prediction for the next trading day stock prices
-		await makeFinalPrediction(position, currentDay);
+		await makeFinalPrediction(position, currentDay, modelName);
 
 		console.log(`GPTD processing completed for position ${position}.`);
 	} catch (error) {

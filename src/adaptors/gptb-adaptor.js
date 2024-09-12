@@ -34,22 +34,49 @@ const getDailyForPosition = async (position) => {
 	return entry.daily;
 };
 
-// Function to fetch stock price data for a given day from daily_SPY.json
+// Function to fetch stock price data for the past 30 days from daily_SPY.json
 const fetchStockPriceData = async (day) => {
-	console.log(`Fetching stock price data for ${day}...`);
+	console.log(
+		`Fetching stock price data for the past 30 days until ${day}...`
+	);
+
 	const stockPath = path.resolve(
 		__dirname,
 		"../../data/stock/daily_SPY.json"
 	);
 	const stockData = JSON.parse(await fs.readFile(stockPath, "utf8"));
 
-	const dailyData = stockData["Time Series (Daily)"][day];
-	if (!dailyData) {
-		throw new Error(`Stock price data for ${day} not found`);
+	// Extract the index from the day variable (e.g., "1_2024-08-08" -> 1)
+	const currentIndex = parseInt(day.split("_")[0]);
+
+	// Calculate the starting index, which can go into negative indices (e.g., -28, -27, ..., 1)
+	const startIndex = currentIndex - 29;
+
+	const fetchedData = [];
+
+	// Loop through the range of indices, supporting both negative and positive
+	for (let i = startIndex; i <= currentIndex; i++) {
+		// Construct the index key (e.g., "-27_2022-05-31", "1_2024-08-08")
+		const indexKey = Object.keys(stockData["Time Series (Daily)"]).find(
+			(key) => parseInt(key.split("_")[0]) === i
+		);
+
+		if (indexKey) {
+			const dailyData = stockData["Time Series (Daily)"][indexKey];
+			fetchedData.push(dailyData);
+		} else {
+			console.warn(`Stock price data for index ${i} not found.`);
+		}
 	}
 
-	console.log(`Fetched stock price data for ${day}`);
-	return dailyData;
+	if (fetchedData.length === 0) {
+		throw new Error(
+			`No stock price data found for the past 30 days up to ${day}`
+		);
+	}
+
+	console.log(`Fetched stock price data for ${fetchedData.length} days.`);
+	return fetchedData;
 };
 
 // Function to fetch sentiment analysis from gpta.logs.json for a given position
@@ -77,23 +104,26 @@ const fetchSentimentAnalysis = async (position) => {
 const analyzeImpactOnStockPrices = async (
 	sentimentAnalysis,
 	stockPrices,
-	day
+	day,
+	modelName // Accept modelName as parameter
 ) => {
-	console.log(`Analyzing impact on stock prices for ${day}...`);
+	console.log(
+		`Analyzing impact on stock prices for ${day} using model ${modelName}...`
+	);
 
-	const prompt = `Utilise the following data to conduct a comprehensive analysis of how these factors might influence stock price movements for ${day}. Focus on the sentiment analysis and the corresponding stock price data. Your analysis should cover the following aspects in detail:
+	const prompt = `Analyse the following sentiment data and historical stock prices (up to 30 days) to assess their combined impact on stock price movements for ${day}. Your analysis should balance the impact of current news sentiment with historical stock price trends, neither overreacting to negative sentiment nor ignoring potential risks. Address the following points concisely within 1500 characters:
 
-1. **Relevance to Stock Prices**: Identify and explain the direct relevance of the sentiment to stock market trends.
+1. **Historical Influence**: Examine how past stock price trends and patterns should influence the interpretation of today's sentiment, considering both resilience and vulnerability to news.
 
-2. **Sentiment Influence**: Analyse how the sentiment (positive, negative, neutral) correlates with observed or potential stock price movements.
+2. **Balanced Impact**: Evaluate how today's sentiment could interact with historical trends, considering whether the trends reinforce or mitigate the news impact.
 
-3. **Causative Links**: Establish and explain any causative links between the news sentiment and stock price fluctuations.
+3. **Correlation**: Discuss how news sentiment and stock price changes have correlated historically, without giving undue weight to either, and how this might play out today.
 
-4. **Comparative Analysis**: Compare the impact of the current day's sentiment with data from previous days.
+4. **Comparison**: Compare the current day's sentiment and stock price trends with previous days, highlighting any similarities or differences that may inform the analysis.
 
-5. **Potential Anomalies or Exceptions**: Identify and explain any anomalies where the expected impact of sentiment did not align with actual stock price movements.
+5. **Anomalies and Exceptions**: Identify any past instances where news sentiment led to unexpected stock movements, focusing on why those anomalies occurred and whether they are relevant today.
 
-Provide a detailed and structured analysis, incorporating quantitative and qualitative insights to support your conclusions.`;
+Your analysis should reflect a nuanced approach, considering both recent sentiment and long-term historical data to provide a balanced conclusion.`;
 
 	const combinedData = JSON.stringify({
 		sentimentAnalysis,
@@ -101,7 +131,7 @@ Provide a detailed and structured analysis, incorporating quantitative and quali
 	});
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-4o",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{ role: "system", content: prompt },
 			{ role: "user", content: combinedData },
@@ -165,23 +195,24 @@ const logAnalysisResults = async (position, day, analysis) => {
 };
 
 // Function to predict future stock prices based on the analysis
-const predictStockPrices = async (analysis, currentDay) => {
+const predictStockPrices = async (analysis, currentDay, modelName) => {
+	// Accept modelName as parameter
 	const nextDay = `day${parseInt(currentDay.replace("day", "")) + 1}`;
-	console.log(`Predicting stock prices for ${nextDay}...`);
+	console.log(
+		`Predicting stock prices for ${nextDay} using model ${modelName}...`
+	);
 
-	const prompt = `Using the analysis of sentiment impact and market sentiment from ${currentDay}, forecast the stock prices for ${nextDay}. Please provide the prediction in the following format:
+	const prompt = `Based on the sentiment analysis and historical stock prices for ${currentDay}, predict the S&P 500 stock prices for ${nextDay}. Ensure that your prediction balances the influence of both historical stock price trends and current sentiment. Avoid overemphasising either one. Provide the prediction in the following format, ensuring the response is within 1500 characters:
 
 Prediction:
 - Direction: Raise or Fall?
 - Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
 - Confidence: Express the confidence level of this prediction as a percentage (0-100%).
 
-Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
-
-Ensure that the prediction is quantitative, precise, and includes a clear confidence level that reflects how certain the model is in its forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
+Reasoning: Justify your prediction by considering how historical trends and today's sentiment might interact. Ensure your analysis weighs the news sentiment and historical price trends evenly, providing a well-rounded explanation. Consider market trends, sentiment shifts, up to 30 days of historical data, and any relevant anomalies. Ensure the explanation is concise (within 1500 characters), balanced, and analytical.`;
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-4o",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{ role: "system", content: prompt },
 			{ role: "user", content: analysis },
@@ -252,9 +283,12 @@ const logPredictionResults = async (position, day, prediction) => {
 };
 
 // Function to handle the entire GPTB processing
-const gptb = async (position) => {
+const gptb = async (position, modelName) => {
+	// Accept modelName as parameter
 	try {
-		console.log(`Starting GPTB processing for position ${position}...`);
+		console.log(
+			`Starting GPTB processing for position ${position} using model ${modelName}...`
+		);
 
 		const day = await getDailyForPosition(position);
 		const stockPrices = await fetchStockPriceData(day);
@@ -263,11 +297,12 @@ const gptb = async (position) => {
 		const analysis = await analyzeImpactOnStockPrices(
 			sentimentAnalysis,
 			stockPrices,
-			day
+			day,
+			modelName // Pass modelName to analysis function
 		);
 		await logAnalysisResults(position, day, analysis);
 
-		const prediction = await predictStockPrices(analysis, day);
+		const prediction = await predictStockPrices(analysis, day, modelName); // Pass modelName to prediction function
 		await logPredictionResults(position, day, prediction);
 
 		console.log(`GPTB processing completed for position ${position}.`);

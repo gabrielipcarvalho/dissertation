@@ -3,7 +3,11 @@
 File: ../src/orchestration/orchestration-program.js
 ========================================
 
-// File: src/orchestration/orchestration-program.js
+// src/orchestration/orchestration-program.js
+
+const fs = require("fs");
+const path = require("path");
+const openai = require("openai"); // Assuming OpenAI SDK is set up
 
 // Import necessary libraries and adaptors
 const {
@@ -18,11 +22,16 @@ const {
 const {
 	gptd, // GPTD function
 } = require("../adaptors/gptd-adaptor");
-const path = require("path");
 
 const { main: evalGptb } = require("../eval_adaptors/eval-gptb");
+const { main: evalGpta } = require("../eval_adaptors/eval-gpta");
+const { main: evalGptc } = require("../eval_adaptors/eval-gptc");
+const { main: evalGptd } = require("../eval_adaptors/eval-gptd");
 
 require("dotenv").config({ path: "../../config/.env" });
+
+// OpenAI API setup
+openai.apiKey = process.env.OPENAI_API_KEY;
 
 // Load the planner file
 const plannerData = require(path.resolve(
@@ -30,31 +39,208 @@ const plannerData = require(path.resolve(
 	"../../data/planner/planner.json"
 ));
 
-// Orchestration function to coordinate adaptors
+// Helper function to rename files after fine-tuning
+const renameLogsForBatch = (batchNumber) => {
+	const logFiles = [
+		{
+			oldPath: "../../data/fine_tuning_data/gpta_fine_tuning_data.jsonl",
+			newPath: `../../data/fine_tuning_data/${batchNumber}-gpta_fine_tuning_data.jsonl`,
+		},
+		{
+			oldPath: "../../data/fine_tuning_data/gptb_fine_tuning_data.jsonl",
+			newPath: `../../data/fine_tuning_data/${batchNumber}-gptb_fine_tuning_data.jsonl`,
+		},
+		{
+			oldPath: "../../data/fine_tuning_data/gptc_fine_tuning_data.jsonl",
+			newPath: `../../data/fine_tuning_data/${batchNumber}-gptc_fine_tuning_data.jsonl`,
+		},
+		{
+			oldPath: "../../data/fine_tuning_data/gptd_fine_tuning_data.jsonl",
+			newPath: `../../data/fine_tuning_data/${batchNumber}-gptd_fine_tuning_data.jsonl`,
+		},
+		{
+			oldPath: "../../data/logs/eval-gpta.logs.json",
+			newPath: `../../data/logs/${batchNumber}-eval-gpta.logs.json`,
+		},
+		{
+			oldPath: "../../data/logs/eval-gptb.logs.json",
+			newPath: `../../data/logs/${batchNumber}-eval-gptb.logs.json`,
+		},
+		{
+			oldPath: "../../data/logs/eval-gptc.logs.json",
+			newPath: `../../data/logs/${batchNumber}-eval-gptc.logs.json`,
+		},
+		{
+			oldPath: "../../data/logs/eval-gptd.logs.json",
+			newPath: `../../data/logs/${batchNumber}-eval-gptd.logs.json`,
+		},
+		{
+			oldPath: "../../data/logs/gpta.logs.json",
+			newPath: `../../data/logs/${batchNumber}-gpta.logs.json`,
+		},
+		{
+			oldPath: "../../data/logs/gptb.logs.json",
+			newPath: `../../data/logs/${batchNumber}-gptb.logs.json`,
+		},
+		{
+			oldPath: "../../data/logs/gptc.logs.json",
+			newPath: `../../data/logs/${batchNumber}-gptc.logs.json`,
+		},
+		{
+			oldPath: "../../data/logs/gptd.logs.json",
+			newPath: `../../data/logs/${batchNumber}-gptd.logs.json`,
+		},
+	];
+
+	logFiles.forEach((file) => {
+		if (fs.existsSync(path.resolve(__dirname, file.oldPath))) {
+			fs.renameSync(
+				path.resolve(__dirname, file.oldPath),
+				path.resolve(__dirname, file.newPath)
+			);
+			console.log(`Renamed ${file.oldPath} to ${file.newPath}`);
+		}
+	});
+};
+
+// Import fine-tuning and data preparation functions for each model
+const prepareGptaData = require("../fine_tuning/gpta_prepare_data");
+const fineTuneGpta = require("../fine_tuning/gpta_fine_tune_and_monitor");
+
+const prepareGptbData = require("../fine_tuning/gptb_prepare_data");
+const fineTuneGptb = require("../fine_tuning/gptb_fine_tune_and_monitor");
+
+const prepareGptcData = require("../fine_tuning/gptc_prepare_data");
+const fineTuneGptc = require("../fine_tuning/gptc_fine_tune_and_monitor");
+
+const prepareGptdData = require("../fine_tuning/gptd_prepare_data");
+const fineTuneGptd = require("../fine_tuning/gptd_fine_tune_and_monitor");
+
+// Function to trigger fine-tuning for GPTA, GPTB, GPTC, GPTD
+const fineTuneModels = async (fineTunedModels) => {
+	console.log("Starting fine-tuning for GPTA, GPTB, GPTC, GPTD...");
+
+	// Prepare data and fine-tune GPTA
+	await prepareGptaData(fineTunedModels.gptaModel);
+	await fineTuneGpta(fineTunedModels.gptaModel);
+
+	// Prepare data and fine-tune GPTB
+	await prepareGptbData(fineTunedModels.gptbModel);
+	await fineTuneGptb(fineTunedModels.gptbModel);
+
+	// Prepare data and fine-tune GPTC
+	await prepareGptcData(fineTunedModels.gptcModel);
+	await fineTuneGptc(fineTunedModels.gptcModel);
+
+	// Prepare data and fine-tune GPTD
+	await prepareGptdData(fineTunedModels.gptdModel);
+	await fineTuneGptd(fineTunedModels.gptdModel);
+
+	console.log("Fine-tuning for all models completed.");
+};
+
+// Function to wait for the fine-tuned model to be ready
+const waitForFineTunedModel = async (modelName) => {
+	console.log(`Waiting for model ${modelName} to become ready...`);
+	let isReady = false;
+
+	while (!isReady) {
+		const response = await openai.models.retrieve(modelName);
+
+		if (response.status === "ready") {
+			console.log(`Model ${modelName} is ready for use.`);
+			isReady = true;
+		} else {
+			console.log(
+				`Model ${modelName} is not ready yet. Checking again in 1 minute...`
+			);
+			await new Promise((resolve) => setTimeout(resolve, 60000)); // Wait 1 minute before checking again
+		}
+	}
+};
+
+// Function to retrieve the new fine-tuned model name
+const getFineTunedModelName = async (jobId) => {
+	const response = await openai.fineTuning.jobs.retrieve(jobId);
+	return response.fine_tuned_model;
+};
+
+// Orchestration function to coordinate adaptors and fine-tuning
 const orchestrateAdaptors = async () => {
 	try {
+		let batchNumber = 1;
+		let fineTunedModels = {
+			gptaModel: "gpt-4o-mini-2024-07-18", // Initial model names
+			gptbModel: "gpt-4o-mini-2024-07-18",
+			gptcModel: "gpt-4o-mini-2024-07-18",
+			gptdModel: "gpt-4o-mini-2024-07-18",
+		};
+
 		// Iterate over each entry in the planner except the last one
 		for (let i = 0; i < plannerData.length - 1; i++) {
 			const { position, daily } = plannerData[i];
 
 			// Step 1: gpta() processes the news data
-			await gpta(position);
+			await gpta(position, fineTunedModels.gptaModel);
 
 			// Step 2: gptb() processes stock data and fetches gpta()'s results
-			await gptb(position);
+			await gptb(position, fineTunedModels.gptbModel);
 
 			// Step 3: gptc() analyzes the stock data
-			await gptc(position);
+			await gptc(position, fineTunedModels.gptcModel);
 
 			// Step 4: gptd() integrates predictions from gptb() and gptc()
-			await gptd(position);
+			await gptd(position, fineTunedModels.gptdModel);
 
 			// Step 5: eval-gptb() evaluates the predictions made by GPTB
-			await evalGptb(position);
+			await evalGptb(position, fineTunedModels.gptbModel);
+
+			// Step 6: eval-gpta() evaluates the predictions made by GPTA, based on GPTB
+			await evalGpta(position, fineTunedModels.gptaModel);
+
+			// Step 7: eval-gptc() evaluates the predictions made by GPTC
+			await evalGptc(position, fineTunedModels.gptcModel);
+
+			// Step 8: eval-gptd() evaluates the predictions made by GPTD
+			await evalGptd(position, fineTunedModels.gptdModel);
 
 			console.log(
 				`Orchestration completed for position ${position}, day ${daily}`
 			);
+
+			// After position 5, 10, 15, etc., perform fine-tuning and rename logs
+			if (position % 5 === 0) {
+				console.log(
+					`Fine-tuning after processing position ${position}`
+				);
+
+				// Perform fine-tuning for GPTA, GPTB, GPTC, GPTD
+				await fineTuneModels(fineTunedModels);
+
+				// Retrieve fine-tuned model names for GPTA, GPTB, GPTC, GPTD
+				fineTunedModels.gptaModel = await getFineTunedModelName(
+					"gpta_job_id"
+				); // Replace with the actual job ID
+				fineTunedModels.gptbModel = await getFineTunedModelName(
+					"gptb_job_id"
+				);
+				fineTunedModels.gptcModel = await getFineTunedModelName(
+					"gptc_job_id"
+				);
+				fineTunedModels.gptdModel = await getFineTunedModelName(
+					"gptd_job_id"
+				);
+
+				// Wait for models to be ready
+				await waitForFineTunedModel(fineTunedModels.gptaModel);
+				await waitForFineTunedModel(fineTunedModels.gptbModel);
+				await waitForFineTunedModel(fineTunedModels.gptcModel);
+				await waitForFineTunedModel(fineTunedModels.gptdModel);
+
+				// Rename logs and fine-tuning data after fine-tuning
+				renameLogsForBatch(batchNumber);
+				batchNumber++; // Increment batch number for the next set of files
+			}
 		}
 	} catch (error) {
 		console.error("Error during orchestration:", error);
@@ -75,6 +261,7 @@ File: ../src/adaptors/gptc-adaptor.js
 
 // File: src/adaptors/gptc-adaptor.js
 
+// Import necessary libraries
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
 const path = require("path");
@@ -87,16 +274,43 @@ const openai = new OpenAI({
 	apiKey: process.env.GPTC_API_KEY,
 });
 
-// Function to read and parse stock price data from JSON file
-const readStockPriceData = async (day) => {
+// Function to read and parse stock price data for the last 60 days
+const readStockPriceData = async (currentDay) => {
 	const filePath = path.resolve(__dirname, "../../data/stock/daily_SPY.json");
 	try {
 		const stockData = JSON.parse(await fs.readFile(filePath, "utf8"));
-		const dailyData = stockData["Time Series (Daily)"][day];
-		if (!dailyData) {
-			throw new Error(`Stock price data for ${day} not found`);
+
+		// Extract current index from the currentDay (e.g., "1_2024-08-08" -> 1 or "-27_2022-02-03" -> -27)
+		const currentIndex = parseInt(currentDay.split("_")[0]);
+
+		// Calculate the start index for fetching the previous 60 days, allowing for negative indices
+		const startIndex = currentIndex - 59;
+
+		const fetchedData = [];
+
+		// Loop to fetch data for the past 60 days (from startIndex to currentIndex)
+		for (let i = startIndex; i <= currentIndex; i++) {
+			// Find the key that matches the index
+			const indexKey = Object.keys(stockData["Time Series (Daily)"]).find(
+				(key) => parseInt(key.split("_")[0]) === i
+			);
+
+			if (indexKey) {
+				const dailyData = stockData["Time Series (Daily)"][indexKey];
+				fetchedData.push(dailyData);
+			} else {
+				console.warn(`Stock price data for index ${i} not found.`);
+			}
 		}
-		return dailyData;
+
+		if (fetchedData.length === 0) {
+			throw new Error(
+				`No stock price data found for the past 60 days up to ${currentDay}`
+			);
+		}
+
+		console.log(`Fetched stock price data for ${fetchedData.length} days.`);
+		return fetchedData;
 	} catch (error) {
 		console.error(
 			`Error reading stock price data from file: ${filePath}`,
@@ -107,7 +321,12 @@ const readStockPriceData = async (day) => {
 };
 
 // Function to analyze stock prices using GPT model and generate a prediction
-const analyzeStockPricesWithGPT = async (stockPrices, currentDay) => {
+const analyzeStockPricesWithGPT = async (
+	stockPrices,
+	currentDay,
+	modelName
+) => {
+	// Added modelName parameter
 	const prompt = `Analyze the following stock price data for trends and patterns, and make a concrete prediction for the next trading day. Clearly state whether stock prices are expected to rise or fall, and specify the expected percentage change or price range. Your prediction must be quantitative and actionable, enabling validation against actual market outcomes and also enabling fine-tuning. Consider historical trends, market behavior, and any notable anomalies in the data.
 
 Prediction:
@@ -117,11 +336,13 @@ Prediction:
 
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
 
+Make sure your response is within 1500 characters.
+
 The stock price data to analyze is: ${JSON.stringify(stockPrices)}`;
 
 	try {
 		const completion = await openai.chat.completions.create({
-			model: "gpt-3.5-turbo",
+			model: modelName, // Use dynamic model name here
 			messages: [
 				{
 					role: "system",
@@ -205,9 +426,12 @@ const logGptcResults = async (position, day, prediction) => {
 };
 
 // Main GPTC function
-const gptc = async (position) => {
+const gptc = async (position, modelName) => {
+	// Accept modelName as parameter
 	try {
-		console.log(`Starting GPTC processing for position ${position}...`);
+		console.log(
+			`Starting GPTC processing for position ${position} using model ${modelName}...`
+		);
 
 		// Load the planner file and get the corresponding daily entry for the position
 		const plannerPath = path.resolve(
@@ -223,7 +447,11 @@ const gptc = async (position) => {
 
 		const day = entry.daily;
 		const stockPrices = await readStockPriceData(day);
-		const prediction = await analyzeStockPricesWithGPT(stockPrices, day);
+		const prediction = await analyzeStockPricesWithGPT(
+			stockPrices,
+			day,
+			modelName
+		); // Pass modelName to analyzeStockPricesWithGPT
 
 		await logGptcResults(position, day, prediction);
 
@@ -332,7 +560,12 @@ const fetchPredictionData = async (position, filePath) => {
 };
 
 // Function to integrate and analyze predictions from GPTB and GPTC
-const integrateAndAnalyzePredictions = async (position, currentDay) => {
+const integrateAndAnalyzePredictions = async (
+	position,
+	currentDay,
+	modelName
+) => {
+	// Added modelName parameter
 	try {
 		const gptbLogsPath = path.resolve(
 			__dirname,
@@ -355,12 +588,12 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 		const prompt = `Integrate and analyze predictions from GPTB and GPTC for Day ${currentDay}, assessing the alignment and discrepancies between the two forecasts. Ensure the analysis highlights key points of agreement and divergence between the models, providing a comprehensive understanding of their predictions. Predictions from GPTB: ${gptbPrediction}, Predictions from GPTC: ${gptcPrediction}.`;
 
 		const completion = await openai.chat.completions.create({
-			model: "gpt-3.5-turbo",
+			model: modelName, // Use dynamic model name here
 			messages: [
 				{
 					role: "system",
 					content:
-						"Synthesize the information from GPTB and GPTC models to provide a cohesive analysis. Your analysis should integrate insights from both models, highlighting areas of agreement and divergence, and explain the implications for stock price movements. Ensure the analysis is detailed and includes quantitative assessments where possible.",
+						"Synthesize the information from GPTB and GPTC models to provide a cohesive analysis. Your analysis should integrate insights from both models, highlighting areas of agreement and divergence, and explain the implications for stock price movements. Ensure the analysis is detailed and includes quantitative assessments where possible. Make sure your response is within 1500 characters.",
 				},
 				{
 					role: "user",
@@ -405,7 +638,8 @@ const integrateAndAnalyzePredictions = async (position, currentDay) => {
 };
 
 // Function to make a final prediction for the next trading day stock prices
-const makeFinalPrediction = async (position, currentDay) => {
+const makeFinalPrediction = async (position, currentDay, modelName) => {
+	// Added modelName parameter
 	try {
 		const gptdLogsPath = path.resolve(
 			__dirname,
@@ -433,15 +667,15 @@ Prediction:
 - Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
 - Confidence: Express the confidence level of this prediction as a percentage (0-100%).
 
-Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Analysis data: ${analysisData}.`;
+Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed. Make sure your response is within 1500 characters. Analysis data: ${analysisData}.`;
 
 		const completion = await openai.chat.completions.create({
-			model: "gpt-3.5-turbo",
+			model: modelName, // Use dynamic model name here
 			messages: [
 				{
 					role: "system",
 					content:
-						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, including a confidence level, to enable validation against actual market outcomes.",
+						"Provide a detailed forecast using the integrated analysis from GPTB and GPTC. Your forecast should clearly state whether stock prices will rise or fall, by how much, and include the reasoning behind your prediction. Ensure the forecast is actionable and precise, including a confidence level, to enable validation against actual market outcomes. Make sure the response is within 1500 characters.",
 				},
 				{
 					role: "user",
@@ -474,9 +708,12 @@ Reasoning: Provide a concise explanation for the prediction, including relevant 
 };
 
 // Main GPTD function to integrate analysis and make predictions
-const gptd = async (position) => {
+const gptd = async (position, modelName) => {
+	// Accept modelName as parameter
 	try {
-		console.log(`Starting GPTD processing for position ${position}...`);
+		console.log(
+			`Starting GPTD processing for position ${position} using model ${modelName}...`
+		);
 
 		// Load the planner file and get the corresponding daily entry for the position
 		const plannerPath = path.resolve(
@@ -493,10 +730,10 @@ const gptd = async (position) => {
 		const currentDay = entry.daily;
 
 		// Integrate and analyze predictions from GPTB and GPTC
-		await integrateAndAnalyzePredictions(position, currentDay);
+		await integrateAndAnalyzePredictions(position, currentDay, modelName);
 
 		// Make final prediction for the next trading day stock prices
-		await makeFinalPrediction(position, currentDay);
+		await makeFinalPrediction(position, currentDay, modelName);
 
 		console.log(`GPTD processing completed for position ${position}.`);
 	} catch (error) {
@@ -569,16 +806,19 @@ const fetchNewsData = async (newsId) => {
 };
 
 // Function to extract key information using GPT
-const extractKeyInformation = async (newsData) => {
-	console.log("Extracting key information from news data...");
+const extractKeyInformation = async (newsData, modelName) => {
+	// Accept modelName as a parameter
+	console.log(
+		`Extracting key information from news data using model ${modelName}...`
+	);
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{
 				role: "system",
 				content:
-					"Please analyse the following text and extract key information that could significantly impact stock market trends. Focus on identifying critical details related to corporate earnings, economic announcements, geopolitical events, market forecasts, and other influential factors. Ensure the summary is concise and highlights the potential market implications of each identified element.",
+					"You are an AI model tasked with extracting key information from the provided news text that could significantly impact stock prices for companies in the S&P 500 index. Focus on identifying specific details related to corporate earnings, economic data, market forecasts, and geopolitical events. Each identified piece of information should be directly linked to its potential impact on the stock market. Keep the extraction focused and concise, ensuring the final output is within 1500 characters.",
 			},
 			{
 				role: "user",
@@ -598,15 +838,18 @@ const extractKeyInformation = async (newsData) => {
 };
 
 // Function to perform sentiment analysis using GPT
-const performSentimentAnalysis = async (keyInformation) => {
-	console.log("Performing sentiment analysis on key information...");
+const performSentimentAnalysis = async (keyInformation, modelName) => {
+	// Accept modelName as a parameter
+	console.log(
+		`Performing sentiment analysis on key information using model ${modelName}...`
+	);
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{
 				role: "system",
 				content:
-					"Utilise the provided information to perform a comprehensive sentiment analysis, determining the overall sentiment (positive, negative, or neutral) and its intensity. Focus on how this sentiment might affect stock market trends, considering the potential impact on market movements, investor behaviour, and future market forecasts. Provide a detailed explanation of your analysis and its implications for stock market trends.",
+					"You are an AI model performing sentiment analysis on the extracted key information from financial news. For each identified section, evaluate the sentiment as Very Negative, Negative, Neutral, Positive, or Very Positive based on its potential impact on the S&P 500 stock prices. Very Negative indicates a high likelihood of decreasing the index, while Very Positive indicates a high likelihood of increasing it. After evaluating each section, calculate an overall sentiment for the entire news piece. Ensure your analysis is within 1500 characters.",
 			},
 			{
 				role: "user",
@@ -684,17 +927,24 @@ const logResults = async (
 };
 
 // Main GPTA function
-const gpta = async (position) => {
+const gpta = async (position, modelName) => {
+	// Accept modelName as a parameter
 	try {
-		console.log(`Starting GPTA processing for position ${position}...`);
+		console.log(
+			`Starting GPTA processing for position ${position} using model ${modelName}...`
+		);
 		const newsIds = await getNewsForPosition(position);
 
 		for (const newsId of newsIds) {
 			const newsData = await fetchNewsData(newsId);
-			const keyInformation = await extractKeyInformation(newsData);
+			const keyInformation = await extractKeyInformation(
+				newsData,
+				modelName
+			); // Pass modelName
 			const sentimentAnalysis = await performSentimentAnalysis(
-				keyInformation
-			);
+				keyInformation,
+				modelName
+			); // Pass modelName
 
 			await logResults(
 				position,
@@ -703,7 +953,7 @@ const gpta = async (position) => {
 				sentimentAnalysis
 			);
 			console.log(
-				`GPTA processed news for ${newsId} at position ${position}`
+				`GPTA processed news for ${newsId} at position ${position} using model ${modelName}`
 			);
 		}
 
@@ -759,22 +1009,49 @@ const getDailyForPosition = async (position) => {
 	return entry.daily;
 };
 
-// Function to fetch stock price data for a given day from daily_SPY.json
+// Function to fetch stock price data for the past 30 days from daily_SPY.json
 const fetchStockPriceData = async (day) => {
-	console.log(`Fetching stock price data for ${day}...`);
+	console.log(
+		`Fetching stock price data for the past 30 days until ${day}...`
+	);
+
 	const stockPath = path.resolve(
 		__dirname,
 		"../../data/stock/daily_SPY.json"
 	);
 	const stockData = JSON.parse(await fs.readFile(stockPath, "utf8"));
 
-	const dailyData = stockData["Time Series (Daily)"][day];
-	if (!dailyData) {
-		throw new Error(`Stock price data for ${day} not found`);
+	// Extract the index from the day variable (e.g., "1_2024-08-08" -> 1)
+	const currentIndex = parseInt(day.split("_")[0]);
+
+	// Calculate the starting index, which can go into negative indices (e.g., -28, -27, ..., 1)
+	const startIndex = currentIndex - 29;
+
+	const fetchedData = [];
+
+	// Loop through the range of indices, supporting both negative and positive
+	for (let i = startIndex; i <= currentIndex; i++) {
+		// Construct the index key (e.g., "-27_2022-05-31", "1_2024-08-08")
+		const indexKey = Object.keys(stockData["Time Series (Daily)"]).find(
+			(key) => parseInt(key.split("_")[0]) === i
+		);
+
+		if (indexKey) {
+			const dailyData = stockData["Time Series (Daily)"][indexKey];
+			fetchedData.push(dailyData);
+		} else {
+			console.warn(`Stock price data for index ${i} not found.`);
+		}
 	}
 
-	console.log(`Fetched stock price data for ${day}`);
-	return dailyData;
+	if (fetchedData.length === 0) {
+		throw new Error(
+			`No stock price data found for the past 30 days up to ${day}`
+		);
+	}
+
+	console.log(`Fetched stock price data for ${fetchedData.length} days.`);
+	return fetchedData;
 };
 
 // Function to fetch sentiment analysis from gpta.logs.json for a given position
@@ -802,23 +1079,26 @@ const fetchSentimentAnalysis = async (position) => {
 const analyzeImpactOnStockPrices = async (
 	sentimentAnalysis,
 	stockPrices,
-	day
+	day,
+	modelName // Accept modelName as parameter
 ) => {
-	console.log(`Analyzing impact on stock prices for ${day}...`);
+	console.log(
+		`Analyzing impact on stock prices for ${day} using model ${modelName}...`
+	);
 
-	const prompt = `Utilise the following data to conduct a comprehensive analysis of how these factors might influence stock price movements for ${day}. Focus on the sentiment analysis and the corresponding stock price data. Your analysis should cover the following aspects in detail:
+	const prompt = `Analyse the following sentiment data and historical stock prices (up to 30 days) to assess their combined impact on stock price movements for ${day}. Your analysis should balance the impact of current news sentiment with historical stock price trends, neither overreacting to negative sentiment nor ignoring potential risks. Address the following points concisely within 1500 characters:
 
-1. **Relevance to Stock Prices**: Identify and explain the direct relevance of the sentiment to stock market trends.
+1. **Historical Influence**: Examine how past stock price trends and patterns should influence the interpretation of today's sentiment, considering both resilience and vulnerability to news.
 
-2. **Sentiment Influence**: Analyse how the sentiment (positive, negative, neutral) correlates with observed or potential stock price movements.
+2. **Balanced Impact**: Evaluate how today's sentiment could interact with historical trends, considering whether the trends reinforce or mitigate the news impact.
 
-3. **Causative Links**: Establish and explain any causative links between the news sentiment and stock price fluctuations.
+3. **Correlation**: Discuss how news sentiment and stock price changes have correlated historically, without giving undue weight to either, and how this might play out today.
 
-4. **Comparative Analysis**: Compare the impact of the current day's sentiment with data from previous days.
+4. **Comparison**: Compare the current day's sentiment and stock price trends with previous days, highlighting any similarities or differences that may inform the analysis.
 
-5. **Potential Anomalies or Exceptions**: Identify and explain any anomalies where the expected impact of sentiment did not align with actual stock price movements.
+5. **Anomalies and Exceptions**: Identify any past instances where news sentiment led to unexpected stock movements, focusing on why those anomalies occurred and whether they are relevant today.
 
-Provide a detailed and structured analysis, incorporating quantitative and qualitative insights to support your conclusions.`;
+Your analysis should reflect a nuanced approach, considering both recent sentiment and long-term historical data to provide a balanced conclusion.`;
 
 	const combinedData = JSON.stringify({
 		sentimentAnalysis,
@@ -826,7 +1106,7 @@ Provide a detailed and structured analysis, incorporating quantitative and quali
 	});
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{ role: "system", content: prompt },
 			{ role: "user", content: combinedData },
@@ -890,23 +1170,24 @@ const logAnalysisResults = async (position, day, analysis) => {
 };
 
 // Function to predict future stock prices based on the analysis
-const predictStockPrices = async (analysis, currentDay) => {
+const predictStockPrices = async (analysis, currentDay, modelName) => {
+	// Accept modelName as parameter
 	const nextDay = `day${parseInt(currentDay.replace("day", "")) + 1}`;
-	console.log(`Predicting stock prices for ${nextDay}...`);
+	console.log(
+		`Predicting stock prices for ${nextDay} using model ${modelName}...`
+	);
 
-	const prompt = `Using the analysis of sentiment impact and market sentiment from ${currentDay}, forecast the stock prices for ${nextDay}. Please provide the prediction in the following format:
+	const prompt = `Based on the sentiment analysis and historical stock prices for ${currentDay}, predict the S&P 500 stock prices for ${nextDay}. Ensure that your prediction balances the influence of both historical stock price trends and current sentiment. Avoid overemphasising either one. Provide the prediction in the following format, ensuring the response is within 1500 characters:
 
 Prediction:
 - Direction: Raise or Fall?
 - Amount: Specify the expected percentage change (e.g., 5%, 1%, 0.5%)
 - Confidence: Express the confidence level of this prediction as a percentage (0-100%).
 
-Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
-
-Ensure that the prediction is quantitative, precise, and includes a clear confidence level that reflects how certain the model is in its forecast. The prediction must be actionable and suitable for further validation and fine-tuning.`;
+Reasoning: Justify your prediction by considering how historical trends and today's sentiment might interact. Ensure your analysis weighs the news sentiment and historical price trends evenly, providing a well-rounded explanation. Consider market trends, sentiment shifts, up to 30 days of historical data, and any relevant anomalies. Ensure the explanation is concise (within 1500 characters), balanced, and analytical.`;
 
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: modelName, // Use the passed modelName here
 		messages: [
 			{ role: "system", content: prompt },
 			{ role: "user", content: analysis },
@@ -977,9 +1258,12 @@ const logPredictionResults = async (position, day, prediction) => {
 };
 
 // Function to handle the entire GPTB processing
-const gptb = async (position) => {
+const gptb = async (position, modelName) => {
+	// Accept modelName as parameter
 	try {
-		console.log(`Starting GPTB processing for position ${position}...`);
+		console.log(
+			`Starting GPTB processing for position ${position} using model ${modelName}...`
+		);
 
 		const day = await getDailyForPosition(position);
 		const stockPrices = await fetchStockPriceData(day);
@@ -988,11 +1272,12 @@ const gptb = async (position) => {
 		const analysis = await analyzeImpactOnStockPrices(
 			sentimentAnalysis,
 			stockPrices,
-			day
+			day,
+			modelName // Pass modelName to analysis function
 		);
 		await logAnalysisResults(position, day, analysis);
 
-		const prediction = await predictStockPrices(analysis, day);
+		const prediction = await predictStockPrices(analysis, day, modelName); // Pass modelName to prediction function
 		await logPredictionResults(position, day, prediction);
 
 		console.log(`GPTB processing completed for position ${position}.`);
@@ -1012,42 +1297,42 @@ module.exports = {
 File: ../src/eval_adaptors/eval-gptc.js
 ========================================
 
-// in development
-
-
-========================================
-File: ../src/eval_adaptors/eval-gptb.js
-========================================
-
-const fs = require("fs");
+const fs = require("fs/promises");
 const path = require("path");
 const { OpenAI } = require("openai");
 require("dotenv").config({
 	path: path.resolve(__dirname, "../../config/.env"),
 });
 
-// Configuration using GPTB's specific API key from the .env file
+// Configuration using GPTC's specific API key from the .env file
 const openai = new OpenAI({
-	apiKey: process.env.GPTB_API_KEY,
+	apiKey: process.env.GPTC_API_KEY,
 });
 
 // Function to load JSON data from a file
-function loadJsonFile(filePath) {
-	return JSON.parse(fs.readFileSync(filePath, "utf8"));
+async function loadJsonFile(filePath) {
+	try {
+		const fileContents = await fs.readFile(filePath, "utf8");
+		return JSON.parse(fileContents);
+	} catch (error) {
+		console.error(`Error loading JSON from file ${filePath}:`, error);
+		throw error;
+	}
 }
 
 // Function to fetch data based on the provided position
-function fetchData(position) {
+async function fetchData(position) {
+	console.log(`Fetching data for position: ${position}`);
+
 	const plannerFilePath = path.join(
 		__dirname,
 		"../../data/planner/planner.json"
 	);
-	const plannerData = loadJsonFile(plannerFilePath);
+	const plannerData = await loadJsonFile(plannerFilePath);
 
 	const nextEntry = plannerData.find(
 		(entry) => entry.position === position + 1
 	);
-
 	if (!nextEntry) {
 		throw new Error(`No planner data found for position ${position + 1}`);
 	}
@@ -1058,45 +1343,51 @@ function fetchData(position) {
 		__dirname,
 		"../../data/stock/daily_SPY.json"
 	);
-	const dailySPYData = loadJsonFile(dailySPYFilePath);
-
+	const dailySPYData = await loadJsonFile(dailySPYFilePath);
 	const stockData = dailySPYData["Time Series (Daily)"][dailyDate];
-
 	if (!stockData) {
 		throw new Error(`No stock data found for date ${dailyDate}`);
 	}
 
-	const gptbLogsFilePath = path.join(
+	const gptcLogsFilePath = path.join(
 		__dirname,
-		"../../data/logs/gptb.logs.json"
+		"../../data/logs/gptc.logs.json"
 	);
-	const gptbLogsData = loadJsonFile(gptbLogsFilePath);
-
-	const currentLogEntry = gptbLogsData.find(
+	const gptcLogsData = await loadJsonFile(gptcLogsFilePath);
+	const currentLogEntry = gptcLogsData.find(
 		(entry) => entry.position === position
 	);
-
 	if (!currentLogEntry) {
-		throw new Error(`No GPTB log found for position ${position}`);
+		throw new Error(`No GPTC log found for position ${position}`);
 	}
 
-	const predictionData = currentLogEntry.data.prediction;
-
-	return { stockData, predictionData, dailyDate };
+	return {
+		stockData,
+		predictionData: currentLogEntry.data.prediction,
+		dailyDate,
+	};
 }
 
 // Function to make an API call to OpenAI to evaluate the prediction
-async function evaluatePrediction(stockData, predictionData, dailyDate) {
-	const prompt = `You are given a prediction and the actual stock price data for a specific day. Evaluate how accurate the prediction was in terms of the stock price movement (rise or fall), the magnitude of the movement, and any other relevant details.
+async function evaluatePrediction(
+	stockData,
+	predictionData,
+	dailyDate,
+	modelName
+) {
+	const prompt = `You are an expert in stock market analysis. Given the following prediction and actual stock price data for the specified day, please evaluate how accurate the prediction was. Compare the direction of the movement (rise or fall) and the magnitude of the movement (percentage change). Highlight any areas where the prediction was accurate, partially accurate, or incorrect.
 
-Stock Data for ${dailyDate}: ${JSON.stringify(stockData)}
+Stock Data for ${dailyDate}:
+Direction: ${stockData["6. direction"]}
+Amount: ${stockData["7. amount"]}
 
 Prediction: ${predictionData}
 
-Please provide a detailed analysis comparing the prediction with the actual stock prices. Highlight any aspects where the prediction was accurate, partially accurate, or incorrect. Additionally, discuss the precision of the predicted magnitude of price changes.`;
+Please provide a detailed analysis comparing the prediction with the actual stock prices (make sure the response is within 1500 characters).`;
 
+	console.log(`Sending API request for prediction evaluation.`);
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: modelName,
 		messages: [
 			{
 				role: "system",
@@ -1114,39 +1405,326 @@ Please provide a detailed analysis comparing the prediction with the actual stoc
 }
 
 // Function to make a second API call to generate structured JSON-like data
-async function generateJsonResponse(
-	position,
-	dailyDate,
-	stockData,
-	predictionData
-) {
-	const prompt = `Please analyze the following stock data and prediction. Provide the information in the JSON format below, which includes the direction and percentage change for both the prediction and the actual outcome.
+async function generateJsonResponse(predictionData, modelName) {
+	const prompt = `You are an expert in data analysis, tasked with extracting specific information from a text-based prediction.
+
+	Prediction: ${predictionData}
+
+1. **Prediction Data**: The provided prediction data contains a directional forecast (either "rise" or "fall") and a magnitude of change (a percentage value).
+
+2. **Task**:
+   - **Extract the Direction**: Identify whether the prediction suggests a "rise" or "fall" in stock price.
+   - **Extract the Amount**: Determine the exact percentage change predicted.
+   - **Ensure Accuracy**: The extracted values must directly match the intent and wording of the prediction data.
+   - **Fill the JSON**: Insert these extracted values into the 'gptc' section of the JSON object under 'direction' and 'amount'.
+
+3. **Format**:
+   - Return **only** the JSON object as specified below.
+   - **No Additional Text**: Do not include any explanations, introductions, or formatting like markdown.
+   - The output must be valid JSON that can be parsed directly.
+
+Make sure the response is within 1500 characters.
+
+Below is the JSON structure to fill:
 
 {
-  "position": ${position + 1},
-  "date": "${dailyDate}",
-  "gptb": {
-    "prediction": {
-      "direction": "rise or fall",
-      "amount": "percentage amount of rise or fall"
-    },
-    "outcome": {
-      "direction": "rise or fall",
-      "amount": "percentage amount of rise or fall"
-    }
+  "gptc": {
+    "direction": "Extracted direction",
+    "amount": "Extracted percentage"
   }
 }
 
-Stock Data for ${dailyDate}: ${JSON.stringify(stockData)}
-Prediction: ${predictionData}`;
+**Important**: Only return the filled JSON object. No other text or formatting should be included.`;
 
+	console.log(`Sending API request for structured JSON response.`);
 	const completion = await openai.chat.completions.create({
-		model: "gpt-3.5-turbo",
+		model: modelName,
+		messages: [{ role: "user", content: prompt }],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	// Strip backticks and any other unwanted characters or explanations
+	const cleanedResponse = completion.choices[0].message.content
+		.replace(/```json|```/g, "") // Remove markdown code block backticks
+		.trim();
+
+	try {
+		// Try parsing the cleaned response to ensure it's valid JSON
+		const partialJson = JSON.parse(cleanedResponse);
+		return partialJson;
+	} catch (error) {
+		throw new Error(
+			"Received response is not valid JSON: " + cleanedResponse
+		);
+	}
+}
+
+// Function to log the evaluation result to a JSON file
+async function logEvaluationResult(position, dailyDate, evaluation) {
+	console.log(
+		`Logging evaluation result for position ${
+			position + 1
+		}, date ${dailyDate}`
+	);
+	const logFilePath = path.join(
+		__dirname,
+		"../../data/logs/eval-gptc.logs.json"
+	);
+
+	let logData = [];
+	try {
+		// Try to read the existing log file
+		try {
+			const logFileContents = await fs.readFile(logFilePath, "utf8");
+			if (logFileContents.trim()) {
+				logData = JSON.parse(logFileContents);
+			}
+		} catch (error) {
+			if (error.code !== "ENOENT") {
+				throw error; // Rethrow if error is not related to file non-existence
+			}
+			console.log("Log file not found, creating a new one.");
+		}
+
+		const newEntry = {
+			position: position + 1,
+			"current day": dailyDate,
+			data: {
+				"predict-evaluation": evaluation,
+			},
+		};
+
+		logData.push(newEntry);
+		await fs.writeFile(
+			logFilePath,
+			JSON.stringify(logData, null, 2),
+			"utf8"
+		);
+		console.log(
+			`Evaluation result logged successfully for position ${
+				position + 1
+			}, date ${dailyDate}`
+		);
+	} catch (error) {
+		console.error("Error logging evaluation result:", error);
+	}
+}
+
+// Function to log the structured JSON data into eval.logs.json
+async function logJsonResponse(position, dailyDate, jsonResponse) {
+	console.log(
+		`Logging JSON response for position ${position + 1}, date ${dailyDate}`
+	);
+	const logFilePath = path.join(__dirname, "../../data/logs/eval.logs.json");
+
+	let logData = [];
+	try {
+		// Try to read the existing log file
+		try {
+			const logFileContents = await fs.readFile(logFilePath, "utf8");
+			if (logFileContents.trim()) {
+				logData = JSON.parse(logFileContents);
+			}
+		} catch (error) {
+			if (error.code !== "ENOENT") {
+				console.error("Error reading JSON log file:", error.message);
+				throw error;
+			}
+			console.log("Log file not found, creating a new one.");
+		}
+
+		let parsedJsonResponse = JSON.parse(jsonResponse); // Ensure JSON response is valid
+
+		// Find the relevant log entry by position
+		const targetIndex = logData.findIndex(
+			(entry) => entry.position === position + 1
+		);
+
+		if (targetIndex !== -1) {
+			// Insert the gptc response below gptb and above outcome
+			const existingEntry = logData[targetIndex];
+			logData[targetIndex] = {
+				...existingEntry,
+				gptc: {
+					...parsedJsonResponse.gptc,
+				},
+				outcome: existingEntry.outcome, // Keep the outcome in its original place
+			};
+		} else {
+			console.error(`Log entry for position ${position + 1} not found.`);
+			return;
+		}
+
+		await fs.writeFile(
+			logFilePath,
+			JSON.stringify(logData, null, 2),
+			"utf8"
+		);
+		console.log(
+			`JSON response logged successfully for position ${
+				position + 1
+			}, date ${dailyDate}`
+		);
+	} catch (error) {
+		console.error("Error writing JSON log file:", error.message);
+	}
+}
+
+// Main function to handle the process
+async function main(position, modelName) {
+	console.log(`Starting main process for position ${position}`);
+	try {
+		// Step 2: Fetch the stock data, prediction data, and daily date
+		const { stockData, predictionData, dailyDate } = await fetchData(
+			position
+		);
+
+		// Step 5: Evaluate the prediction using the GPTC model
+		const evaluation = await evaluatePrediction(
+			stockData,
+			predictionData,
+			dailyDate,
+			modelName
+		);
+		await logEvaluationResult(position, dailyDate, evaluation);
+
+		// Step 7: Generate the JSON-like structure from the prediction data
+		const gptcResponse = await generateJsonResponse(
+			predictionData,
+			modelName
+		);
+		console.log(gptcResponse);
+
+		// Step 8: Complete the JSON with the relevant position, date, and outcome
+		const completeJson = {
+			position: position + 1,
+			date: dailyDate,
+			gptc: {
+				...gptcResponse.gptc,
+			},
+			outcome: {
+				direction: stockData["6. direction"],
+				amount: stockData["7. amount"],
+			},
+		};
+
+		// Step 9 & 10: Log the complete JSON response in the eval.logs.json file
+		await logJsonResponse(
+			position,
+			dailyDate,
+			JSON.stringify(completeJson)
+		);
+	} catch (error) {
+		console.error("Error during main process:", error.message);
+		process.exit(1);
+	}
+}
+
+module.exports = { main };
+
+
+========================================
+File: ../src/eval_adaptors/eval-gptb.js
+========================================
+
+const fs = require("fs/promises");
+const path = require("path");
+const { OpenAI } = require("openai");
+require("dotenv").config({
+	path: path.resolve(__dirname, "../../config/.env"),
+});
+
+// Configuration using GPTB's specific API key from the .env file
+const openai = new OpenAI({
+	apiKey: process.env.GPTB_API_KEY,
+});
+
+// Function to load JSON data from a file
+async function loadJsonFile(filePath) {
+	try {
+		const fileContents = await fs.readFile(filePath, "utf8");
+		return JSON.parse(fileContents);
+	} catch (error) {
+		console.error(`Error loading JSON from file ${filePath}:`, error);
+		throw error;
+	}
+}
+
+// Function to fetch data based on the provided position
+async function fetchData(position) {
+	console.log(`Fetching data for position: ${position}`);
+
+	const plannerFilePath = path.join(
+		__dirname,
+		"../../data/planner/planner.json"
+	);
+	const plannerData = await loadJsonFile(plannerFilePath);
+
+	const nextEntry = plannerData.find(
+		(entry) => entry.position === position + 1
+	);
+	if (!nextEntry) {
+		throw new Error(`No planner data found for position ${position + 1}`);
+	}
+
+	const dailyDate = nextEntry.daily;
+
+	const dailySPYFilePath = path.join(
+		__dirname,
+		"../../data/stock/daily_SPY.json"
+	);
+	const dailySPYData = await loadJsonFile(dailySPYFilePath);
+	const stockData = dailySPYData["Time Series (Daily)"][dailyDate];
+	if (!stockData) {
+		throw new Error(`No stock data found for date ${dailyDate}`);
+	}
+
+	const gptbLogsFilePath = path.join(
+		__dirname,
+		"../../data/logs/gptb.logs.json"
+	);
+	const gptbLogsData = await loadJsonFile(gptbLogsFilePath);
+	const currentLogEntry = gptbLogsData.find(
+		(entry) => entry.position === position
+	);
+	if (!currentLogEntry) {
+		throw new Error(`No GPTB log found for position ${position}`);
+	}
+
+	return {
+		stockData,
+		predictionData: currentLogEntry.data.prediction,
+		dailyDate,
+	};
+}
+
+// Function to make an API call to OpenAI to evaluate the prediction
+async function evaluatePrediction(
+	stockData,
+	predictionData,
+	dailyDate,
+	modelName
+) {
+	const prompt = `You are an expert in stock market analysis. Given the following prediction and actual stock price data for the specified day, please evaluate how accurate the prediction was. Compare the direction of the movement (rise or fall) and the magnitude of the movement (percentage change). Highlight any areas where the prediction was accurate, partially accurate, or incorrect.
+
+Stock Data for ${dailyDate}:
+Direction: ${stockData["6. direction"]}
+Amount: ${stockData["7. amount"]}
+
+Prediction: ${predictionData}
+
+Please provide a detailed analysis comparing the prediction with the actual stock prices (make sure the rsponse is within 1500 characters).`;
+
+	console.log(`Sending API request for prediction evaluation.`);
+	const completion = await openai.chat.completions.create({
+		model: modelName,
 		messages: [
 			{
 				role: "system",
-				content:
-					"You are an expert in data analysis. Return the data in the exact JSON format requested.",
+				content: "You are an expert in stock market analysis.",
 			},
 			{ role: "user", content: prompt },
 		],
@@ -1159,8 +1737,71 @@ Prediction: ${predictionData}`;
 	return completion.choices[0].message.content.trim();
 }
 
+// Function to make a second API call to generate structured JSON-like data
+async function generateJsonResponse(predictionData, modelName) {
+	const prompt = `You are an expert in data analysis, tasked with extracting specific information from a text-based prediction. 
+
+	Prediction: ${predictionData}
+
+1. **Prediction Data**: The provided prediction data contains a directional forecast (either "rise" or "fall") and a magnitude of change (a percentage value). 
+
+2. **Task**: 
+   - **Extract the Direction**: Identify whether the prediction suggests a "rise" or "fall" in stock price.
+   - **Extract the Amount**: Determine the exact percentage change predicted.
+   - **Ensure Accuracy**: The extracted values must directly match the intent and wording of the prediction data. 
+   - **Fill the JSON**: Insert these extracted values into the 'gptb' section of the JSON object under 'direction' and 'amount'.
+
+3. **Format**: 
+   - Return **only** the JSON object as specified below. 
+   - **No Additional Text**: Do not include any explanations, introductions, or formatting like markdown. 
+   - The output must be valid JSON that can be parsed directly.
+
+Make sure the response is within 1500 characters!
+
+Below is the JSON structure to fill:
+
+{
+  "gptb": {
+    "direction": "Extracted direction",
+    "amount": "Extracted percentage"
+  }
+}
+
+**Important**: Only return the filled JSON object. No other text or formatting should be included.`;
+
+	console.log(`Sending API request for structured JSON response.`);
+	const completion = await openai.chat.completions.create({
+		model: modelName,
+		messages: [{ role: "user", content: prompt }],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	// Strip backticks and any other unwanted characters or explanations
+	const cleanedResponse = completion.choices[0].message.content
+		.replace(/```json|```/g, "") // Remove markdown code block backticks
+		.trim();
+
+	try {
+		// Try parsing the cleaned response to ensure it's valid JSON
+		const partialJson = JSON.parse(cleanedResponse);
+		return partialJson;
+	} catch (error) {
+		throw new Error(
+			"Received response is not valid JSON: " + cleanedResponse
+		);
+	}
+}
+
 // Function to log the evaluation result to a JSON file
-function logEvaluationResult(position, dailyDate, evaluation) {
+async function logEvaluationResult(position, dailyDate, evaluation) {
+	console.log(
+		`Logging evaluation result for position ${
+			position + 1
+		}, date ${dailyDate}`
+	);
 	const logFilePath = path.join(
 		__dirname,
 		"../../data/logs/eval-gptb.logs.json"
@@ -1168,280 +1809,1586 @@ function logEvaluationResult(position, dailyDate, evaluation) {
 
 	let logData = [];
 	try {
-		if (fs.existsSync(logFilePath)) {
-			const logFileContents = fs.readFileSync(logFilePath, "utf8");
-			if (logFileContents.trim()) {
-				logData = JSON.parse(logFileContents);
-			}
-		}
-	} catch (error) {
-		if (error.code !== "ENOENT") {
-			throw error;
-		}
-	}
-
-	const newEntry = {
-		position: position + 1,
-		"current day": dailyDate,
-		data: {
-			"predict-evaluation": evaluation,
-		},
-	};
-
-	logData.push(newEntry);
-
-	fs.writeFileSync(logFilePath, JSON.stringify(logData, null, 2), {
-		encoding: "utf8",
-	});
-	console.log(
-		`Evaluation result logged successfully for position ${
-			position + 1
-		}, day ${dailyDate}.`
-	);
-}
-
-// Function to log the structured JSON data into eval.logs.json
-async function logJsonResponse(position, dailyDate, jsonResponse) {
-	const logFilePath = path.join(__dirname, "../../data/logs/eval.logs.json");
-
-	let logData = [];
-	try {
-		if (fs.existsSync(logFilePath)) {
+		// Try to read the existing log file
+		try {
 			const logFileContents = await fs.readFile(logFilePath, "utf8");
 			if (logFileContents.trim()) {
 				logData = JSON.parse(logFileContents);
 			}
+		} catch (error) {
+			if (error.code !== "ENOENT") {
+				throw error; // Rethrow if error is not related to file non-existence
+			}
+			console.log("Log file not found, creating a new one.");
 		}
+
+		const newEntry = {
+			position: position + 1,
+			"current day": dailyDate,
+			data: {
+				"predict-evaluation": evaluation,
+			},
+		};
+
+		logData.push(newEntry);
+		await fs.writeFile(
+			logFilePath,
+			JSON.stringify(logData, null, 2),
+			"utf8"
+		);
+		console.log(
+			`Evaluation result logged successfully for position ${
+				position + 1
+			}, date ${dailyDate}`
+		);
 	} catch (error) {
-		if (error.code !== "ENOENT") {
-			console.error("Error reading JSON log file:", error.message);
-			throw error;
+		console.error("Error logging evaluation result:", error);
+	}
+}
+
+// Function to log the structured JSON data into eval.logs.json
+async function logJsonResponse(position, dailyDate, jsonResponse) {
+	console.log(
+		`Logging JSON response for position ${position + 1}, date ${dailyDate}`
+	);
+	const logFilePath = path.join(__dirname, "../../data/logs/eval.logs.json");
+
+	let logData = [];
+	try {
+		// Try to read the existing log file
+		try {
+			const logFileContents = await fs.readFile(logFilePath, "utf8");
+			if (logFileContents.trim()) {
+				logData = JSON.parse(logFileContents);
+			}
+		} catch (error) {
+			if (error.code !== "ENOENT") {
+				console.error("Error reading JSON log file:", error.message);
+				throw error;
+			}
+			console.log("Log file not found, creating a new one.");
 		}
-	}
 
-	// Ensure jsonResponse is a valid JSON string
-	let parsedJsonResponse;
-	try {
-		parsedJsonResponse = JSON.parse(jsonResponse);
-	} catch (error) {
-		console.error("Failed to parse JSON response:", error.message);
-		throw error;
-	}
+		let parsedJsonResponse = JSON.parse(jsonResponse); // Ensure JSON response is valid
+		logData.push(parsedJsonResponse);
 
-	logData.push(parsedJsonResponse);
-
-	try {
-		await fs.writeFile(logFilePath, JSON.stringify(logData, null, 2), {
-			encoding: "utf8",
-		});
+		await fs.writeFile(
+			logFilePath,
+			JSON.stringify(logData, null, 2),
+			"utf8"
+		);
 		console.log(
 			`JSON response logged successfully for position ${
 				position + 1
-			}, day ${dailyDate}.`
+			}, date ${dailyDate}`
 		);
 	} catch (error) {
 		console.error("Error writing JSON log file:", error.message);
-		throw error;
 	}
 }
 
 // Main function to handle the process
-async function main(position) {
+async function main(position, modelName) {
+	console.log(`Starting main process for position ${position}`);
 	try {
-		const { stockData, predictionData, dailyDate } = fetchData(position);
+		const { stockData, predictionData, dailyDate } = await fetchData(
+			position
+		);
 
 		const evaluation = await evaluatePrediction(
 			stockData,
 			predictionData,
-			dailyDate
+			dailyDate,
+			modelName
 		);
+		await logEvaluationResult(position, dailyDate, evaluation);
 
-		logEvaluationResult(position, dailyDate, evaluation);
+		// Get the partial JSON from the model
+		const gptbResponse = await generateJsonResponse(
+			predictionData,
+			modelName
+		);
+		console.log(gptbResponse);
 
-		const jsonResponse = await generateJsonResponse(
+		// Complete the JSON with position, date, and outcome
+		const completeJson = {
+			position: position + 1,
+			date: dailyDate,
+			gptb: {
+				...gptbResponse.gptb,
+			},
+			outcome: {
+				direction: stockData["6. direction"],
+				amount: stockData["7. amount"],
+			},
+		};
+
+		// Log the complete JSON response
+		await logJsonResponse(
 			position,
 			dailyDate,
-			stockData,
-			predictionData
+			JSON.stringify(completeJson)
 		);
-
-		await logJsonResponse(position, dailyDate, jsonResponse);
 	} catch (error) {
-		console.error("Error:", error.message);
+		console.error("Error during main process:", error.message);
 		process.exit(1);
 	}
 }
 
 module.exports = { main };
 
-// const fs = require("fs");
-// const path = require("path");
-// const { OpenAI } = require("openai");
-// require("dotenv").config({
-// 	path: path.resolve(__dirname, "../../config/.env"),
-// });
-
-// // Configuration using GPTB's specific API key from the .env file
-// const openai = new OpenAI({
-// 	apiKey: process.env.GPTB_API_KEY,
-// });
-
-// // Function to load JSON data from a file
-// function loadJsonFile(filePath) {
-// 	return JSON.parse(fs.readFileSync(filePath, "utf8"));
-// }
-
-// // Function to fetch data based on the provided position
-// function fetchData(position) {
-// 	const plannerFilePath = path.join(
-// 		__dirname,
-// 		"../../data/planner/planner.json"
-// 	);
-// 	const plannerData = loadJsonFile(plannerFilePath);
-
-// 	const nextEntry = plannerData.find(
-// 		(entry) => entry.position === position + 1
-// 	);
-
-// 	if (!nextEntry) {
-// 		throw new Error(`No planner data found for position ${position + 1}`);
-// 	}
-
-// 	const dailyDate = nextEntry.daily;
-
-// 	const dailySPYFilePath = path.join(
-// 		__dirname,
-// 		"../../data/stock/daily_SPY.json"
-// 	);
-// 	const dailySPYData = loadJsonFile(dailySPYFilePath);
-
-// 	const stockData = dailySPYData["Time Series (Daily)"][dailyDate];
-
-// 	if (!stockData) {
-// 		throw new Error(`No stock data found for date ${dailyDate}`);
-// 	}
-
-// 	const gptbLogsFilePath = path.join(
-// 		__dirname,
-// 		"../../data/logs/gptb.logs.json"
-// 	);
-// 	const gptbLogsData = loadJsonFile(gptbLogsFilePath);
-
-// 	const currentLogEntry = gptbLogsData.find(
-// 		(entry) => entry.position === position
-// 	);
-
-// 	if (!currentLogEntry) {
-// 		throw new Error(`No GPTB log found for position ${position}`);
-// 	}
-
-// 	const predictionData = currentLogEntry.data.prediction;
-
-// 	return { stockData, predictionData, dailyDate };
-// }
-
-// // Function to make an API call to OpenAI to evaluate the prediction
-// async function evaluatePrediction(stockData, predictionData, dailyDate) {
-// 	const prompt = `You are given a prediction and the actual stock price data for a specific day. Evaluate how accurate the prediction was in terms of the stock price movement (rise or fall), the magnitude of the movement, and any other relevant details.
-
-// Stock Data for ${dailyDate}: ${JSON.stringify(stockData)}
-
-// Prediction: ${predictionData}
-
-// Please provide a detailed analysis comparing the prediction with the actual stock prices. Highlight any aspects where the prediction was accurate, partially accurate, or incorrect. Additionally, discuss the precision of the predicted magnitude of price changes.`;
-
-// 	const completion = await openai.chat.completions.create({
-// 		model: "gpt-3.5-turbo",
-// 		messages: [
-// 			{
-// 				role: "system",
-// 				content: "You are an expert in stock market analysis.",
-// 			},
-// 			{ role: "user", content: prompt },
-// 		],
-// 	});
-
-// 	if (!completion || !completion.choices || completion.choices.length === 0) {
-// 		throw new Error("Invalid response structure from API.");
-// 	}
-
-// 	return completion.choices[0].message.content.trim();
-// }
-
-// // Function to log the evaluation result to a JSON file
-// function logEvaluationResult(position, dailyDate, evaluation) {
-// 	const logFilePath = path.join(
-// 		__dirname,
-// 		"../../data/logs/eval-gptb.logs.json"
-// 	);
-
-// 	let logData = [];
-// 	try {
-// 		if (fs.existsSync(logFilePath)) {
-// 			const logFileContents = fs.readFileSync(logFilePath, "utf8");
-// 			if (logFileContents.trim()) {
-// 				logData = JSON.parse(logFileContents);
-// 			}
-// 		}
-// 	} catch (error) {
-// 		if (error.code !== "ENOENT") {
-// 			throw error;
-// 		}
-// 	}
-
-// 	const newEntry = {
-// 		position: position + 1,
-// 		"current day": dailyDate,
-// 		data: {
-// 			"predict-evaluation": evaluation,
-// 		},
-// 	};
-
-// 	logData.push(newEntry);
-
-// 	fs.writeFileSync(logFilePath, JSON.stringify(logData, null, 2), {
-// 		encoding: "utf8",
-// 	});
-// 	console.log(
-// 		`Evaluation result logged successfully for position ${
-// 			position + 1
-// 		}, day ${dailyDate}.`
-// 	);
-// }
-
-// // Main function to handle the process
-// async function main(position) {
-// 	try {
-// 		const { stockData, predictionData, dailyDate } = fetchData(position);
-
-// 		const evaluation = await evaluatePrediction(
-// 			stockData,
-// 			predictionData,
-// 			dailyDate
-// 		);
-
-// 		logEvaluationResult(position, dailyDate, evaluation);
-// 	} catch (error) {
-// 		console.error("Error:", error.message);
-// 		process.exit(1);
-// 	}
-// }
-
-// module.exports = { main };
-
 
 ========================================
 File: ../src/eval_adaptors/eval-gpta.js
 ========================================
 
-// in development
+// File: src/eval_adaptors/eval-gpta.js
+
+const fs = require("fs/promises");
+const path = require("path");
+const { OpenAI } = require("openai");
+require("dotenv").config({
+	path: path.resolve(__dirname, "../../config/.env"),
+});
+
+// Configuration using GPTA's specific API key from the .env file
+const openai = new OpenAI({
+	apiKey: process.env.GPTA_API_KEY,
+});
+
+// Function to load JSON data from a file
+async function loadJsonFile(filePath) {
+	try {
+		const fileContents = await fs.readFile(filePath, "utf8");
+		return JSON.parse(fileContents);
+	} catch (error) {
+		console.error(`Error loading JSON from file ${filePath}:`, error);
+		throw error;
+	}
+}
+
+// Function to fetch data for GPTA evaluation based on the provided position
+async function fetchData(position) {
+	console.log(`Fetching data for position: ${position}`);
+
+	const plannerFilePath = path.join(
+		__dirname,
+		"../../data/planner/planner.json"
+	);
+	const plannerData = await loadJsonFile(plannerFilePath);
+
+	const currentEntry = plannerData.find(
+		(entry) => entry.position === position
+	);
+	if (!currentEntry) {
+		throw new Error(`No planner data found for position ${position}`);
+	}
+
+	const newsIds = currentEntry.news
+		.split(", ")
+		.map((newsId) => newsId.trim());
+
+	const newsFilePath = path.join(__dirname, "../../data/news/news.json");
+	const newsData = await loadJsonFile(newsFilePath);
+
+	const relevantNews = newsIds.map((newsId) => newsData[newsId]).flat();
+
+	const gptaLogsFilePath = path.join(
+		__dirname,
+		"../../data/logs/gpta.logs.json"
+	);
+	const gptaLogsData = await loadJsonFile(gptaLogsFilePath);
+	const gptaLogEntries = gptaLogsData.filter(
+		(entry) => entry.position === position
+	); // Use filter to get all entries
+
+	const gptbLogsFilePath = path.join(
+		__dirname,
+		"../../data/logs/gptb.logs.json"
+	);
+	const gptbLogsData = await loadJsonFile(gptbLogsFilePath);
+	const gptbLogEntry = gptbLogsData.find(
+		(entry) => entry.position === position
+	);
+
+	const gptbEvalFilePath = path.join(
+		__dirname,
+		"../../data/logs/eval-gptb.logs.json"
+	);
+	const gptbEvalData = await loadJsonFile(gptbEvalFilePath);
+	const gptbEvalEntry = gptbEvalData.find(
+		(entry) => entry.position === position + 1
+	); // Fetch for position + 1
+
+	if (!gptaLogEntries.length || !gptbLogEntry || !gptbEvalEntry) {
+		throw new Error(`No log data found for position ${position}`);
+	}
+
+	return {
+		news: relevantNews,
+		gptaLogEntries,
+		gptbLogEntry,
+		gptbEvalEntry,
+	};
+}
+
+// Function to perform GPTA evaluation
+async function evaluateGPTA(
+	gptaLogEntry,
+	gptbLogEntry,
+	gptbEvalEntry,
+	modelName
+) {
+	// Added modelName parameter
+	const { "key information": keyInfo, "sentiment analysis": sentiment } =
+		gptaLogEntry.data;
+	const { prediction } = gptbLogEntry.data;
+	const { "predict-evaluation": evaluation } = gptbEvalEntry.data;
+
+	const prompt = `
+    GPTA performed a sentiment analysis for the following key information:
+    ${keyInfo}
+
+    Sentiment analysis result:
+    ${sentiment}
+
+    GPTB prediction:
+    ${prediction}
+
+    GPTB evaluation:
+    ${evaluation}
+
+	- Did GPTB’s prediction match the actual outcome?
+    - How much did GPTA's sentiment analysis influence GPTB’s prediction accuracy?
+    - If GPTB was correct, assess the sentiment’s contribution.
+    - If GPTB was incorrect, evaluate whether GPTA’s sentiment analysis caused GPTB to exaggerate positive or negative aspects, leading to an incorrect prediction.
+    - Provide suggestions on how GPTA can, without any new dataset, improve its sentiment analysis for future predictions.
+    - The response must be within 1500 characters.
+	`;
+
+	console.log("Sending API request for GPTA evaluation.");
+	const completion = await openai.chat.completions.create({
+		model: modelName, // Use dynamic model name here
+		messages: [
+			{
+				role: "system",
+				content:
+					"You are an expert in stock market sentiment analysis evaluation.",
+			},
+			{ role: "user", content: prompt },
+		],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	return completion.choices[0].message.content.trim();
+}
+
+// Function to log GPTA evaluation results
+async function logGPTAEvaluation(position, evaluation) {
+	console.log(`Logging GPTA evaluation result for position ${position}`);
+	const logFilePath = path.join(
+		__dirname,
+		"../../data/logs/eval-gpta.logs.json"
+	);
+
+	let logData = [];
+	try {
+		const logFileContents = await fs.readFile(logFilePath, "utf8");
+		if (logFileContents.trim()) {
+			logData = JSON.parse(logFileContents);
+		}
+	} catch (error) {
+		if (error.code !== "ENOENT") {
+			throw error; // Rethrow if error is not related to file non-existence
+		}
+		console.log("Log file not found, creating a new one.");
+	}
+
+	const newEntry = {
+		position,
+		evaluation: evaluation,
+	};
+
+	logData.push(newEntry);
+	await fs.writeFile(logFilePath, JSON.stringify(logData, null, 2), "utf8");
+	console.log(
+		`GPTA evaluation result logged successfully for position ${position}`
+	);
+}
+
+// Main function to handle GPTA evaluation
+async function main(position, modelName) {
+	// Changed the function name to 'main'
+	try {
+		const { news, gptaLogEntries, gptbLogEntry, gptbEvalEntry } =
+			await fetchData(position);
+
+		// Iterate over multiple GPTA log entries
+		for (const gptaLogEntry of gptaLogEntries) {
+			const evaluation = await evaluateGPTA(
+				gptaLogEntry,
+				gptbLogEntry,
+				gptbEvalEntry,
+				modelName // Pass modelName to evaluation function
+			);
+			await logGPTAEvaluation(position, evaluation);
+		}
+
+		console.log(`GPTA evaluation completed for position ${position}`);
+	} catch (error) {
+		console.error("Error during GPTA evaluation:", error.message);
+	}
+}
+
+module.exports = { main }; // Export 'main'
 
 
 ========================================
 File: ../src/eval_adaptors/eval-gptd.js
 ========================================
 
-// in development
+const fs = require("fs/promises");
+const path = require("path");
+const { OpenAI } = require("openai");
+require("dotenv").config({
+	path: path.resolve(__dirname, "../../config/.env"),
+});
+
+// Configuration using GPTD's specific API key from the .env file
+const openai = new OpenAI({
+	apiKey: process.env.GPTD_API_KEY,
+});
+
+// Function to load JSON data from a file
+async function loadJsonFile(filePath) {
+	try {
+		const fileContents = await fs.readFile(filePath, "utf8");
+		return JSON.parse(fileContents);
+	} catch (error) {
+		console.error(`Error loading JSON from file ${filePath}:`, error);
+		throw error;
+	}
+}
+
+// Function to fetch data based on the provided position
+async function fetchData(position) {
+	console.log(`Fetching data for position: ${position}`);
+
+	const plannerFilePath = path.join(
+		__dirname,
+		"../../data/planner/planner.json"
+	);
+	const plannerData = await loadJsonFile(plannerFilePath);
+
+	const nextEntry = plannerData.find(
+		(entry) => entry.position === position + 1
+	);
+	if (!nextEntry) {
+		throw new Error(`No planner data found for position ${position + 1}`);
+	}
+
+	const dailyDate = nextEntry.daily;
+
+	const dailySPYFilePath = path.join(
+		__dirname,
+		"../../data/stock/daily_SPY.json"
+	);
+	const dailySPYData = await loadJsonFile(dailySPYFilePath);
+	const stockData = dailySPYData["Time Series (Daily)"][dailyDate];
+	if (!stockData) {
+		throw new Error(`No stock data found for date ${dailyDate}`);
+	}
+
+	const gptdLogsFilePath = path.join(
+		__dirname,
+		"../../data/logs/gptd.logs.json"
+	);
+	const gptdLogsData = await loadJsonFile(gptdLogsFilePath);
+	const currentLogEntry = gptdLogsData.find(
+		(entry) => entry.position === position
+	);
+	if (!currentLogEntry) {
+		throw new Error(`No GPTD log found for position ${position}`);
+	}
+
+	return {
+		stockData,
+		predictionData: currentLogEntry.data.prediction,
+		dailyDate,
+	};
+}
+
+// Function to make an API call to OpenAI to evaluate the prediction
+async function evaluatePrediction(
+	stockData,
+	predictionData,
+	dailyDate,
+	modelName
+) {
+	const prompt = `You are an expert in stock market analysis. Given the following prediction and actual stock price data for the specified day, please evaluate how accurate the prediction was. Compare the direction of the movement (rise or fall) and the magnitude of the movement (percentage change). Highlight any areas where the prediction was accurate, partially accurate, or incorrect.
+
+Stock Data for ${dailyDate}:
+Direction: ${stockData["6. direction"]}
+Amount: ${stockData["7. amount"]}
+
+Prediction: ${predictionData}
+
+Please provide a detailed analysis comparing the prediction with the actual stock prices (make sure the response is within 1500 characters).`;
+
+	console.log(`Sending API request for prediction evaluation.`);
+	const completion = await openai.chat.completions.create({
+		model: modelName,
+		messages: [
+			{
+				role: "system",
+				content: "You are an expert in stock market analysis.",
+			},
+			{ role: "user", content: prompt },
+		],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	return completion.choices[0].message.content.trim();
+}
+
+// Function to make a second API call to generate structured JSON-like data
+async function generateJsonResponse(predictionData, modelName) {
+	const prompt = `You are an expert in data analysis, tasked with extracting specific information from a text-based prediction.
+
+Prediction: ${predictionData}
+
+1. **Prediction Data**: The provided prediction compares predictions made by others and then it outputs a final prediction, this final prediction data contains a directional forecast (either "rise" or "fall") and a magnitude of change (a percentage value).
+
+2. **Task**:
+   - **Extract the Direction**: Identify whether the prediction suggests a "rise" or "fall" in stock price.
+   - **Extract the Amount**: Determine the exact percentage change predicted.
+   - **Ensure Accuracy**: The extracted values must directly match the intent and wording of the prediction data.
+   - **Fill the JSON**: Insert these extracted values into the 'gptd' section of the JSON object under 'direction' and 'amount'.
+
+3. **Format**:
+   - Return **only** the JSON object as specified below.
+   - **No Additional Text**: Do not include any explanations, introductions, or formatting like markdown.
+   - The output must be valid JSON that can be parsed directly.
+
+Make sure the response is within 1500 characters.
+
+Below is the JSON structure to fill:
+
+{
+  "gptd": {
+    "direction": "Extracted direction",
+    "amount": "Extracted percentage"
+  }
+}
+
+**Important**: Only return the filled JSON object. No other text or formatting should be included.`;
+
+	console.log(`Sending API request for structured JSON response.`);
+	const completion = await openai.chat.completions.create({
+		model: modelName,
+		messages: [{ role: "user", content: prompt }],
+	});
+
+	if (!completion || !completion.choices || completion.choices.length === 0) {
+		throw new Error("Invalid response structure from API.");
+	}
+
+	// Strip backticks and any other unwanted characters or explanations
+	const cleanedResponse = completion.choices[0].message.content
+		.replace(/```json|```/g, "") // Remove markdown code block backticks
+		.trim();
+
+	try {
+		// Try parsing the cleaned response to ensure it's valid JSON
+		const partialJson = JSON.parse(cleanedResponse);
+		return partialJson;
+	} catch (error) {
+		throw new Error(
+			"Received response is not valid JSON: " + cleanedResponse
+		);
+	}
+}
+
+// Function to log the evaluation result to a JSON file
+async function logEvaluationResult(position, dailyDate, evaluation) {
+	console.log(
+		`Logging evaluation result for position ${
+			position + 1
+		}, date ${dailyDate}`
+	);
+	const logFilePath = path.join(
+		__dirname,
+		"../../data/logs/eval-gptd.logs.json"
+	);
+
+	let logData = [];
+	try {
+		// Try to read the existing log file
+		try {
+			const logFileContents = await fs.readFile(logFilePath, "utf8");
+			if (logFileContents.trim()) {
+				logData = JSON.parse(logFileContents);
+			}
+		} catch (error) {
+			if (error.code !== "ENOENT") {
+				throw error; // Rethrow if error is not related to file non-existence
+			}
+			console.log("Log file not found, creating a new one.");
+		}
+
+		const newEntry = {
+			position: position + 1,
+			"current day": dailyDate,
+			data: {
+				"predict-evaluation": evaluation,
+			},
+		};
+
+		logData.push(newEntry);
+		await fs.writeFile(
+			logFilePath,
+			JSON.stringify(logData, null, 2),
+			"utf8"
+		);
+		console.log(
+			`Evaluation result logged successfully for position ${
+				position + 1
+			}, date ${dailyDate}`
+		);
+	} catch (error) {
+		console.error("Error logging evaluation result:", error);
+	}
+}
+
+// Function to log the structured JSON data into eval.logs.json
+async function logJsonResponse(position, dailyDate, jsonResponse) {
+	console.log(
+		`Logging JSON response for position ${position + 1}, date ${dailyDate}`
+	);
+	const logFilePath = path.join(__dirname, "../../data/logs/eval.logs.json");
+
+	let logData = [];
+	try {
+		// Try to read the existing log file
+		try {
+			const logFileContents = await fs.readFile(logFilePath, "utf8");
+			if (logFileContents.trim()) {
+				logData = JSON.parse(logFileContents);
+			}
+		} catch (error) {
+			if (error.code !== "ENOENT") {
+				console.error("Error reading JSON log file:", error.message);
+				throw error;
+			}
+			console.log("Log file not found, creating a new one.");
+		}
+
+		let parsedJsonResponse = JSON.parse(jsonResponse); // Ensure JSON response is valid
+
+		// Find the relevant log entry by position
+		const targetIndex = logData.findIndex(
+			(entry) => entry.position === position + 1
+		);
+
+		if (targetIndex !== -1) {
+			// Insert the gptd response below gptc and above outcome
+			const existingEntry = logData[targetIndex];
+			logData[targetIndex] = {
+				...existingEntry,
+				gptd: {
+					...parsedJsonResponse.gptd,
+				},
+				outcome: existingEntry.outcome, // Keep the outcome in its original place
+			};
+		} else {
+			console.error(`Log entry for position ${position + 1} not found.`);
+			return;
+		}
+
+		await fs.writeFile(
+			logFilePath,
+			JSON.stringify(logData, null, 2),
+			"utf8"
+		);
+		console.log(
+			`JSON response logged successfully for position ${
+				position + 1
+			}, date ${dailyDate}`
+		);
+	} catch (error) {
+		console.error("Error writing JSON log file:", error.message);
+	}
+}
+
+// Main function to handle the process
+async function main(position, modelName) {
+	console.log(`Starting main process for position ${position}`);
+	try {
+		// Step 2: Fetch the stock data, prediction data, and daily date
+		const { stockData, predictionData, dailyDate } = await fetchData(
+			position
+		);
+
+		// Step 5: Evaluate the prediction using the GPTD model
+		const evaluation = await evaluatePrediction(
+			stockData,
+			predictionData,
+			dailyDate,
+			modelName
+		);
+		await logEvaluationResult(position, dailyDate, evaluation);
+
+		// Step 7: Generate the JSON-like structure from the prediction data
+		const gptdResponse = await generateJsonResponse(
+			predictionData,
+			modelName
+		);
+		console.log(gptdResponse);
+
+		// Step 8: Complete the JSON with the relevant position, date, and outcome
+		const completeJson = {
+			position: position + 1,
+			date: dailyDate,
+			gptd: {
+				...gptdResponse.gptd,
+			},
+			outcome: {
+				direction: stockData["6. direction"],
+				amount: stockData["7. amount"],
+			},
+		};
+
+		// Step 9 & 10: Log the complete JSON response in the eval.logs.json file
+		await logJsonResponse(
+			position,
+			dailyDate,
+			JSON.stringify(completeJson)
+		);
+	} catch (error) {
+		console.error("Error during main process:", error.message);
+		process.exit(1);
+	}
+}
+
+module.exports = { main };
+
+
+========================================
+File: ../src/fine_tuning/gptb_fine_tune_and_monitor.js
+========================================
+
+// src/fine_tuning/gptb_fine_tune_and_monitor.js
+
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+const { Configuration, OpenAIApi } = require("openai");
+
+// Load environment variables from the .env file
+dotenv.config({ path: path.join(__dirname, "../../config/.env") });
+
+// Load the OpenAI API key from the environment variable
+const openaiApiKey = process.env.GPTB_API_KEY;
+
+if (!openaiApiKey) {
+	throw new Error(
+		"API key for OpenAI is missing. Please set it in the GPTB_API_KEY environment variable."
+	);
+}
+
+// Initialize the OpenAI client with the API key
+const configuration = new Configuration({
+	apiKey: openaiApiKey,
+});
+const openai = new OpenAIApi(configuration);
+
+// Function to upload the dataset for fine-tuning
+async function uploadTrainingFile() {
+	const fineTuningFilePath = path.join(
+		__dirname,
+		"../../data/fine_tuning_data/gptb_fine_tuning_data.jsonl"
+	);
+	try {
+		const fileStream = fs.createReadStream(fineTuningFilePath);
+		const response = await openai.createFile({
+			file: fileStream,
+			purpose: "fine-tune",
+		});
+		return response.data.id;
+	} catch (error) {
+		console.error(
+			"Error uploading file:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to create the fine-tuning job
+async function createFineTuningJob(trainingFileId, modelId) {
+	try {
+		const response = await openai.createFineTune({
+			training_file: trainingFileId,
+			model: modelId, // Use the modelId passed from orchestration
+			n_epochs: 3, // Number of epochs, can be adjusted
+		});
+		return response.data.id;
+	} catch (error) {
+		console.error(
+			"Error creating fine-tuning job:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to check the fine-tuning job status
+async function checkJobStatus(jobId) {
+	try {
+		const response = await openai.retrieveFineTune(jobId);
+		const status = response.data.status;
+		console.log(`Fine-tuning job status: ${status}`);
+		return status;
+	} catch (error) {
+		console.error(
+			"Error retrieving job status:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to monitor the job status and wait for completion
+async function monitorJobStatus(jobId) {
+	while (true) {
+		const status = await checkJobStatus(jobId);
+		if (status === "succeeded" || status === "failed") {
+			return status;
+		}
+		console.log("Waiting for 10 minutes before the next check...");
+		await new Promise((resolve) => setTimeout(resolve, 600000)); // Wait for 10 minutes (600000ms)
+	}
+}
+
+// Function to list recent fine-tuning jobs
+async function listRecentFineTuningJobs() {
+	try {
+		const response = await openai.listFineTunes({ limit: 10 });
+		console.log("Recent fine-tuning jobs:");
+		response.data.forEach((job) => {
+			console.log(`Job ID: ${job.id}, Status: ${job.status}`);
+		});
+	} catch (error) {
+		console.error(
+			"Error listing recent jobs:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Main async function to run the workflow
+module.exports = async function fineTuneAndMonitor(modelId) {
+	try {
+		// Upload the training file
+		const trainingFileId = await uploadTrainingFile();
+		console.log(`Training file uploaded with ID: ${trainingFileId}`);
+
+		// Create a fine-tuning job with the provided model ID
+		const fineTuneJobId = await createFineTuningJob(
+			trainingFileId,
+			modelId
+		);
+		console.log(`Fine-tuning job started with ID: ${fineTuneJobId}`);
+
+		// Monitor the job status
+		const finalStatus = await monitorJobStatus(fineTuneJobId);
+		if (finalStatus === "succeeded") {
+			console.log("Fine-tuning completed successfully!");
+		} else if (finalStatus === "failed") {
+			console.log(
+				"Fine-tuning failed. Please check the logs or contact support."
+			);
+		} else {
+			console.log(`Unexpected status: ${finalStatus}`);
+		}
+
+		// List recent jobs for reference
+		await listRecentFineTuningJobs();
+	} catch (error) {
+		console.error(
+			"An error occurred during the fine-tuning process:",
+			error.message
+		);
+	}
+};
+
+
+========================================
+File: ../src/fine_tuning/gpta_prepare_data.js
+========================================
+
+// src/fine_tuning/gpta_prepare_data.js
+
+const fs = require("fs");
+const path = require("path");
+
+// Function to prepare fine-tuning data
+module.exports = function prepareGptaData(modelId) {
+	// Paths to logs
+	const gptaLogsPath = path.join(__dirname, "../../data/logs/gpta.logs.json");
+	const evalGptaLogsPath = path.join(
+		__dirname,
+		"../../data/logs/eval-gpta.logs.json"
+	);
+	const outputPath = path.join(
+		__dirname,
+		"../../data/fine_tuning_data/gpta_fine_tuning_data.jsonl"
+	);
+
+	// Load existing logs
+	const gptaLogs = JSON.parse(fs.readFileSync(gptaLogsPath, "utf8"));
+	const evalGptaLogs = JSON.parse(fs.readFileSync(evalGptaLogsPath, "utf8"));
+
+	// Prepare fine-tuning data
+	const fineTuningData = [];
+
+	// Group eval_gpta_logs by position for easy lookup
+	const evalGptaLogsByPosition = evalGptaLogs.reduce((acc, evalEntry) => {
+		const position = evalEntry.position;
+		if (!acc[position]) {
+			acc[position] = [];
+		}
+		acc[position].push(evalEntry);
+		return acc;
+	}, {});
+
+	// Iterate over gpta logs and gather all entries for the same position
+	const gptaDataByPosition = gptaLogs.reduce((acc, gptaEntry) => {
+		const position = gptaEntry.position;
+
+		if (!acc[position]) {
+			acc[position] = {
+				"key information": "",
+				"sentiment analysis": "",
+			};
+		}
+
+		// Concatenate key information and sentiment analysis for the same position
+		acc[position]["key information"] +=
+			gptaEntry.data["key information"] + "\n\n";
+		acc[position]["sentiment analysis"] +=
+			gptaEntry.data["sentiment analysis"] + "\n\n";
+
+		return acc;
+	}, {});
+
+	// Now, match the concatenated data with eval-gpta logs by position
+	Object.keys(gptaDataByPosition).forEach((position) => {
+		if (evalGptaLogsByPosition[position]) {
+			const evalEntries = evalGptaLogsByPosition[position];
+
+			// Prepare fine-tuning data for each evaluation entry found
+			evalEntries.forEach((evalEntry) => {
+				const conversation = {
+					messages: [
+						{
+							role: "system",
+							content:
+								"You are an expert in stock market sentiment analysis.",
+						},
+						{
+							role: "user",
+							content: `Here is the key information and sentiment analysis for position ${position}:\n${gptaDataByPosition[position]["key information"]}\nSentiment: ${gptaDataByPosition[position]["sentiment analysis"]}`,
+						},
+						{
+							role: "assistant",
+							content: `Evaluation: ${evalEntry.evaluation}`,
+						},
+					],
+				};
+				fineTuningData.push(conversation);
+			});
+		}
+	});
+
+	// Save the fine-tuning data in a JSONL format
+	fs.writeFileSync(
+		outputPath,
+		fineTuningData.map((entry) => JSON.stringify(entry)).join("\n")
+	);
+
+	console.log(`Fine-tuning data for model ${modelId} saved to ${outputPath}`);
+};
+
+
+========================================
+File: ../src/fine_tuning/gptc_fine_tune_and_monitor.js
+========================================
+
+// src/fine_tuning/gptc_fine_tune_and_monitor.js
+
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+const { Configuration, OpenAIApi } = require("openai");
+
+// Load environment variables from the .env file
+dotenv.config({ path: path.join(__dirname, "../../config/.env") });
+
+// Load the OpenAI API key from the environment variable
+const openaiApiKey = process.env.GPTC_API_KEY;
+
+if (!openaiApiKey) {
+	throw new Error(
+		"API key for OpenAI is missing. Please set it in the GPTC_API_KEY environment variable."
+	);
+}
+
+// Initialize the OpenAI client with the API key
+const configuration = new Configuration({
+	apiKey: openaiApiKey,
+});
+const openai = new OpenAIApi(configuration);
+
+// Function to upload the dataset
+async function uploadTrainingFile() {
+	const fineTuningFilePath = path.join(
+		__dirname,
+		"../../data/fine_tuning_data/gptc_fine_tuning_data.jsonl"
+	);
+
+	try {
+		const fileStream = fs.createReadStream(fineTuningFilePath);
+		const response = await openai.createFile({
+			file: fileStream,
+			purpose: "fine-tune",
+		});
+		return response.data.id;
+	} catch (error) {
+		console.error(
+			"Error uploading file:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to create the fine-tuning job
+async function createFineTuningJob(trainingFileId, model) {
+	try {
+		const response = await openai.createFineTune({
+			training_file: trainingFileId,
+			model: model, // Use the model passed from orchestration
+			n_epochs: 3, // Start with 3 epochs
+		});
+		return response.data.id;
+	} catch (error) {
+		console.error(
+			"Error creating fine-tuning job:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to check the fine-tuning job status
+async function checkJobStatus(jobId) {
+	try {
+		const response = await openai.retrieveFineTune(jobId);
+		const status = response.data.status;
+		console.log(`Fine-tuning job status: ${status}`);
+		return status;
+	} catch (error) {
+		console.error(
+			"Error retrieving job status:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to monitor the fine-tuning job status
+async function monitorJobStatus(jobId) {
+	while (true) {
+		const status = await checkJobStatus(jobId);
+		if (status === "succeeded" || status === "failed") {
+			return status;
+		}
+		console.log("Waiting for 1 minute before next check...");
+		await new Promise((resolve) => setTimeout(resolve, 60000)); // Wait for 1 minute (60000ms)
+	}
+}
+
+// Function to list recent fine-tuning jobs
+async function listRecentFineTuningJobs() {
+	try {
+		const response = await openai.listFineTunes({ limit: 10 });
+		console.log("Recent fine-tuning jobs:");
+		response.data.forEach((job) => {
+			console.log(`Job ID: ${job.id}, Status: ${job.status}`);
+		});
+	} catch (error) {
+		console.error(
+			"Error listing recent jobs:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Export the function to run the fine-tuning process
+module.exports = async function fineTuneAndMonitor(model) {
+	try {
+		const trainingFileId = await uploadTrainingFile();
+		console.log(`Training file uploaded with ID: ${trainingFileId}`);
+
+		const fineTuneJobId = await createFineTuningJob(trainingFileId, model);
+		console.log(`Fine-tuning job started with ID: ${fineTuneJobId}`);
+
+		const finalStatus = await monitorJobStatus(fineTuneJobId);
+		if (finalStatus === "succeeded") {
+			console.log("Fine-tuning completed successfully!");
+		} else if (finalStatus === "failed") {
+			console.log(
+				"Fine-tuning failed. Please check the logs or contact support."
+			);
+		} else {
+			console.log(`Unexpected status: ${finalStatus}`);
+		}
+
+		await listRecentFineTuningJobs();
+	} catch (error) {
+		console.error(
+			"An error occurred during the fine-tuning process:",
+			error.message
+		);
+	}
+};
+
+
+========================================
+File: ../src/fine_tuning/gptc_prepare_data.js
+========================================
+
+// src/fine_tuning/gptc_prepare_data.js
+
+const fs = require("fs");
+const path = require("path");
+
+// Function to prepare fine-tuning data for GPTC using the correct model
+module.exports = function prepareDataForGPTC(model) {
+	// Paths to logs
+	const gptcLogsPath = path.join(__dirname, "../../data/logs/gptc.logs.json");
+	const evalLogsPath = path.join(
+		__dirname,
+		"../../data/logs/eval-gptc.logs.json"
+	);
+	const outputPath = path.join(
+		__dirname,
+		"../../data/fine_tuning_data/gptc_fine_tuning_data.jsonl"
+	);
+
+	// Load existing logs
+	const gptcLogs = JSON.parse(fs.readFileSync(gptcLogsPath, "utf8"));
+	const evalLogs = JSON.parse(fs.readFileSync(evalLogsPath, "utf8"));
+
+	// Prepare fine-tuning data
+	const fineTuningData = [];
+
+	// Iterate over logs and prepare fine-tuning dataset
+	gptcLogs.forEach((gptcEntry, index) => {
+		const evalEntry = evalLogs[index];
+		const conversation = {
+			messages: [
+				{
+					role: "system",
+					content:
+						"You are a financial assistant who predicts stock movements based on historical data.",
+				},
+				{
+					role: "user",
+					content: `Here is the stock data for ${gptcEntry["current day"]}: ${gptcEntry.data.prediction}`,
+				},
+				{
+					role: "assistant",
+					content: `Evaluation: ${evalEntry.data["predict-evaluation"]}`,
+				},
+			],
+		};
+		fineTuningData.push(conversation);
+	});
+
+	// Save the fine-tuning data in a JSONL format
+	fs.writeFileSync(
+		outputPath,
+		fineTuningData.map((entry) => JSON.stringify(entry)).join("\n")
+	);
+
+	console.log(`Fine-tuning data for ${model} saved to ${outputPath}`);
+};
+
+
+========================================
+File: ../src/fine_tuning/gpta_fine_tune_and_monitor.js
+========================================
+
+// src/fine_tuning/gpta_fine_tune_and_monitor.js
+
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+const { OpenAI } = require("openai"); // Correct import from the latest SDK
+
+// Load environment variables from the .env file
+dotenv.config({ path: path.join(__dirname, "../../config/.env") });
+
+// Load the OpenAI API key from the environment variable
+const openaiApiKey = process.env.GPTA_API_KEY;
+
+if (!openaiApiKey) {
+	throw new Error(
+		"API key for OpenAI is missing. Please set it in the GPTA_API_KEY environment variable."
+	);
+}
+
+// Initialize the OpenAI client directly
+const openai = new OpenAI({
+	apiKey: openaiApiKey,
+});
+
+// Upload the dataset for fine-tuning
+const fineTuningFilePath = path.join(
+	__dirname,
+	"../../data/fine_tuning_data/gpta_fine_tuning_data.jsonl"
+);
+
+async function uploadTrainingFile() {
+	try {
+		const fileStream = fs.createReadStream(fineTuningFilePath);
+		const response = await openai.files.create({
+			file: fileStream,
+			purpose: "fine-tune",
+		});
+		return response.id;
+	} catch (error) {
+		console.error(
+			"Error uploading file:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+async function createFineTuningJob(trainingFileId, modelId) {
+	try {
+		const response = await openai.fineTunes.create({
+			training_file: trainingFileId,
+			model: modelId, // Use the passed modelId from the orchestration program
+			n_epochs: 4, // Adjust the number of epochs if necessary
+		});
+		return response.id;
+	} catch (error) {
+		console.error(
+			"Error creating fine-tuning job:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+async function checkJobStatus(jobId) {
+	try {
+		const response = await openai.fineTunes.retrieve(jobId);
+		const status = response.status;
+		console.log(`Fine-tuning job status: ${status}`);
+		return status;
+	} catch (error) {
+		console.error(
+			"Error retrieving job status:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+async function monitorJobStatus(jobId) {
+	while (true) {
+		const status = await checkJobStatus(jobId);
+		if (status === "succeeded" || status === "failed") {
+			return status;
+		}
+		console.log("Waiting for 10 minutes before the next check...");
+		await new Promise((resolve) => setTimeout(resolve, 600000)); // Wait for 10 minutes (600000ms)
+	}
+}
+
+async function listRecentFineTuningJobs() {
+	try {
+		const response = await openai.fineTunes.list({ limit: 10 });
+		console.log("Recent fine-tuning jobs:");
+		response.data.forEach((job) => {
+			console.log(`Job ID: ${job.id}, Status: ${job.status}`);
+		});
+	} catch (error) {
+		console.error(
+			"Error listing recent jobs:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Main async function to run the workflow
+module.exports = async function fineTuneGptaModel(modelId) {
+	try {
+		const trainingFileId = await uploadTrainingFile();
+		console.log(`Training file uploaded with ID: ${trainingFileId}`);
+
+		const fineTuneJobId = await createFineTuningJob(
+			trainingFileId,
+			modelId
+		);
+		console.log(`Fine-tuning job started with ID: ${fineTuneJobId}`);
+
+		const finalStatus = await monitorJobStatus(fineTuneJobId);
+		if (finalStatus === "succeeded") {
+			console.log("Fine-tuning completed successfully!");
+		} else if (finalStatus === "failed") {
+			console.log(
+				"Fine-tuning failed. Please check the logs or contact support."
+			);
+		} else {
+			console.log(`Unexpected status: ${finalStatus}`);
+		}
+
+		await listRecentFineTuningJobs();
+	} catch (error) {
+		console.error(
+			"An error occurred during the fine-tuning process:",
+			error.message
+		);
+	}
+};
+
+
+========================================
+File: ../src/fine_tuning/gptd_prepare_data.js
+========================================
+
+// src/fine_tuning/gptd_prepare_data.js
+
+const fs = require("fs");
+const path = require("path");
+
+// Function to prepare fine-tuning data, now accepting the model as an argument
+module.exports = function prepareDataForFineTuning(model) {
+	console.log(`Preparing fine-tuning data for model: ${model}`);
+
+	// Paths to logs
+	const gptdLogsPath = path.join(__dirname, "../../data/logs/gptd.logs.json");
+	const evalGptdLogsPath = path.join(
+		__dirname,
+		"../../data/logs/eval-gptd.logs.json"
+	);
+	const outputPath = path.join(
+		__dirname,
+		"../../data/fine_tuning_data/gptd_fine_tuning_data.jsonl"
+	);
+
+	// Load existing logs
+	const gptdLogs = JSON.parse(fs.readFileSync(gptdLogsPath, "utf8"));
+	const evalGptdLogs = JSON.parse(fs.readFileSync(evalGptdLogsPath, "utf8"));
+
+	// Prepare fine-tuning data
+	const fineTuningData = [];
+
+	// Group eval_gptd_logs by position for easy lookup
+	const evalGptdLogsByPosition = evalGptdLogs.reduce((acc, evalEntry) => {
+		const position = evalEntry.position;
+		if (!acc[position]) {
+			acc[position] = [];
+		}
+		acc[position].push(evalEntry);
+		return acc;
+	}, {});
+
+	// Iterate over gptd logs and match them with eval-gptd logs
+	gptdLogs.forEach((gptdEntry) => {
+		const position = gptdEntry.position;
+		const evalPosition = position + 1; // Match position 1 with position 2 in eval
+
+		if (evalGptdLogsByPosition[evalPosition]) {
+			const matchingEvalEntries = evalGptdLogsByPosition[evalPosition];
+
+			// Prepare fine-tuning data for each matching entry
+			matchingEvalEntries.forEach((evalEntry) => {
+				const conversation = {
+					messages: [
+						{
+							role: "system",
+							content:
+								"You are an expert financial assistant who predicts stock movements based on model analysis and market data.",
+						},
+						{
+							role: "user",
+							content: `Here is the analysis and prediction for position ${gptdEntry.position}: ${gptdEntry.data.analysis} \nPrediction: ${gptdEntry.data.prediction}`,
+						},
+						{
+							role: "assistant",
+							content: `Evaluation: ${evalEntry.data["predict-evaluation"]}`,
+						},
+					],
+				};
+				fineTuningData.push(conversation);
+			});
+		}
+	});
+
+	// Save the fine-tuning data in a JSONL format
+	fs.writeFileSync(
+		outputPath,
+		fineTuningData.map((entry) => JSON.stringify(entry)).join("\n")
+	);
+
+	console.log(`Fine-tuning data saved to ${outputPath}`);
+};
+
+
+========================================
+File: ../src/fine_tuning/gptd_fine_tune_and_monitor.js
+========================================
+
+// src/fine_tuning/gptd_fine_tune_and_monitor.js
+
+const fs = require("fs");
+const path = require("path");
+const dotenv = require("dotenv");
+const { Configuration, OpenAIApi } = require("openai");
+
+// Load environment variables from the .env file
+dotenv.config({ path: path.join(__dirname, "../../config/.env") });
+
+// Load the OpenAI API key from the environment variable
+const openaiApiKey = process.env.GPTD_API_KEY;
+
+if (!openaiApiKey) {
+	throw new Error(
+		"API key for OpenAI is missing. Please set it in the GPTD_API_KEY environment variable."
+	);
+}
+
+// Initialize the OpenAI client with the API key
+const configuration = new Configuration({
+	apiKey: openaiApiKey,
+});
+const openai = new OpenAIApi(configuration);
+
+// Function to upload the dataset
+async function uploadTrainingFile() {
+	const fineTuningFilePath = path.join(
+		__dirname,
+		"../../data/fine_tuning_data/gptd_fine_tuning_data.jsonl"
+	);
+
+	try {
+		const fileStream = fs.createReadStream(fineTuningFilePath);
+		const response = await openai.createFile({
+			file: fileStream,
+			purpose: "fine-tune",
+		});
+		return response.data.id;
+	} catch (error) {
+		console.error(
+			"Error uploading file:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to create the fine-tuning job, now accepting a model as an argument
+async function createFineTuningJob(trainingFileId, model) {
+	try {
+		const response = await openai.createFineTune({
+			training_file: trainingFileId,
+			model: model, // Use the correct model passed as an argument
+			n_epochs: 3, // Start with 3 epochs
+		});
+		return response.data.id;
+	} catch (error) {
+		console.error(
+			"Error creating fine-tuning job:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to check the fine-tuning job status
+async function checkJobStatus(jobId) {
+	try {
+		const response = await openai.retrieveFineTune(jobId);
+		const status = response.data.status;
+		console.log(`Fine-tuning job status: ${status}`);
+		return status;
+	} catch (error) {
+		console.error(
+			"Error retrieving job status:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Function to monitor the fine-tuning job status
+async function monitorJobStatus(jobId) {
+	while (true) {
+		const status = await checkJobStatus(jobId);
+		if (status === "succeeded" || status === "failed") {
+			return status;
+		}
+		console.log("Waiting for 10 minutes before next check...");
+		await new Promise((resolve) => setTimeout(resolve, 600000)); // Wait for 10 minutes (600000ms)
+	}
+}
+
+// Function to list recent fine-tuning jobs
+async function listRecentFineTuningJobs() {
+	try {
+		const response = await openai.listFineTunes({ limit: 10 });
+		console.log("Recent fine-tuning jobs:");
+		response.data.forEach((job) => {
+			console.log(`Job ID: ${job.id}, Status: ${job.status}`);
+		});
+	} catch (error) {
+		console.error(
+			"Error listing recent jobs:",
+			error.response ? error.response.data : error.message
+		);
+		throw error;
+	}
+}
+
+// Main function to run the entire workflow, now accepting the model argument
+module.exports = async function fineTuneAndMonitor(model) {
+	try {
+		const trainingFileId = await uploadTrainingFile();
+		console.log(`Training file uploaded with ID: ${trainingFileId}`);
+
+		const fineTuneJobId = await createFineTuningJob(trainingFileId, model);
+		console.log(`Fine-tuning job started with ID: ${fineTuneJobId}`);
+
+		const finalStatus = await monitorJobStatus(fineTuneJobId);
+		if (finalStatus === "succeeded") {
+			console.log("Fine-tuning completed successfully!");
+		} else if (finalStatus === "failed") {
+			console.log(
+				"Fine-tuning failed. Please check the logs or contact support."
+			);
+		} else {
+			console.log(`Unexpected status: ${finalStatus}`);
+		}
+
+		await listRecentFineTuningJobs();
+	} catch (error) {
+		console.error(
+			"An error occurred during the fine-tuning process:",
+			error.message
+		);
+	}
+};
+
+
+========================================
+File: ../src/fine_tuning/gptb_prepare_data.js
+========================================
+
+// src/fine_tuning/gptb_prepare_data.js
+
+const fs = require("fs");
+const path = require("path");
+
+// Paths to logs
+const gptbLogsPath = path.join(__dirname, "../../data/logs/gptb.logs.json");
+const evalGptbLogsPath = path.join(
+	__dirname,
+	"../../data/logs/eval-gptb.logs.json"
+);
+const outputPath = path.join(
+	__dirname,
+	"../../data/fine_tuning_data/gptb_fine_tuning_data.jsonl"
+);
+
+// Load existing logs
+const gptbLogs = JSON.parse(fs.readFileSync(gptbLogsPath, "utf8"));
+const evalGptbLogs = JSON.parse(fs.readFileSync(evalGptbLogsPath, "utf8"));
+
+// Prepare fine-tuning data
+const fineTuningData = [];
+
+// Group eval_gptb_logs by position for easy lookup
+const evalGptbLogsByPosition = evalGptbLogs.reduce((acc, evalEntry) => {
+	const position = evalEntry.position;
+	if (!acc[position]) {
+		acc[position] = [];
+	}
+	acc[position].push(evalEntry);
+	return acc;
+}, {});
+
+// Iterate over gptb logs and match with the corresponding eval-gptb logs (shifted by 1)
+gptbLogs.forEach((gptbEntry) => {
+	const position = gptbEntry.position;
+	const nextPosition = position + 1; // Match with eval-gptb.logs.json position X+1
+
+	if (evalGptbLogsByPosition[nextPosition]) {
+		const evalEntries = evalGptbLogsByPosition[nextPosition];
+
+		// Prepare fine-tuning data for each evaluation entry found
+		evalEntries.forEach((evalEntry) => {
+			const conversation = {
+				messages: [
+					{
+						role: "system",
+						content:
+							"You are a financial market prediction model that makes stock price predictions based on sentiment analysis and historical data.",
+					},
+					{
+						role: "user",
+						content: `Here is the analysis and prediction for position ${position} (current day: ${gptbEntry["current day"]}):\n${gptbEntry.data.analysis}\nPrediction: ${gptbEntry.data.prediction}`,
+					},
+					{
+						role: "assistant",
+						content: `Evaluation: ${evalEntry.data["predict-evaluation"]}`,
+					},
+				],
+			};
+			fineTuningData.push(conversation);
+		});
+	}
+});
+
+// Save the fine-tuning data in a JSONL format
+fs.writeFileSync(
+	outputPath,
+	fineTuningData.map((entry) => JSON.stringify(entry)).join("\n")
+);
+
+console.log(`Fine-tuning data saved to ${outputPath}`);
+
+// Export function to be used in orchestration
+module.exports = function prepareDataForFineTuning(modelId) {
+	console.log(`Preparing data for GPTB fine-tuning with model: ${modelId}`);
+	// The rest of the code remains unchanged
+	return fineTuningData;
+};
 
 
 ========================================
@@ -1458,9 +3405,11 @@ directories_to_include = [
     "../src/orchestration",
     "../src/adaptors",
     "../src/eval_adaptors",
+    "../src/fine_tuning"
     # "../src/news_fetch",
     # "../src/planner",
-    # "../src/stock_fetch"
+    # "../src/stock_fetch",
+    # "../src/metrics"
 ]
 extensions_to_include = ['.py', '.js']
 

@@ -1,5 +1,6 @@
 // File: src/adaptors/gptc-adaptor.js
 
+// Import necessary libraries
 const { OpenAI } = require("openai");
 const fs = require("fs").promises;
 const path = require("path");
@@ -12,16 +13,43 @@ const openai = new OpenAI({
 	apiKey: process.env.GPTC_API_KEY,
 });
 
-// Function to read and parse stock price data from JSON file
-const readStockPriceData = async (day) => {
+// Function to read and parse stock price data for the last 60 days
+const readStockPriceData = async (currentDay) => {
 	const filePath = path.resolve(__dirname, "../../data/stock/daily_SPY.json");
 	try {
 		const stockData = JSON.parse(await fs.readFile(filePath, "utf8"));
-		const dailyData = stockData["Time Series (Daily)"][day];
-		if (!dailyData) {
-			throw new Error(`Stock price data for ${day} not found`);
+
+		// Extract current index from the currentDay (e.g., "1_2024-08-08" -> 1 or "-27_2022-02-03" -> -27)
+		const currentIndex = parseInt(currentDay.split("_")[0]);
+
+		// Calculate the start index for fetching the previous 60 days, allowing for negative indices
+		const startIndex = currentIndex - 59;
+
+		const fetchedData = [];
+
+		// Loop to fetch data for the past 60 days (from startIndex to currentIndex)
+		for (let i = startIndex; i <= currentIndex; i++) {
+			// Find the key that matches the index
+			const indexKey = Object.keys(stockData["Time Series (Daily)"]).find(
+				(key) => parseInt(key.split("_")[0]) === i
+			);
+
+			if (indexKey) {
+				const dailyData = stockData["Time Series (Daily)"][indexKey];
+				fetchedData.push(dailyData);
+			} else {
+				console.warn(`Stock price data for index ${i} not found.`);
+			}
 		}
-		return dailyData;
+
+		if (fetchedData.length === 0) {
+			throw new Error(
+				`No stock price data found for the past 60 days up to ${currentDay}`
+			);
+		}
+
+		console.log(`Fetched stock price data for ${fetchedData.length} days.`);
+		return fetchedData;
 	} catch (error) {
 		console.error(
 			`Error reading stock price data from file: ${filePath}`,
@@ -32,7 +60,12 @@ const readStockPriceData = async (day) => {
 };
 
 // Function to analyze stock prices using GPT model and generate a prediction
-const analyzeStockPricesWithGPT = async (stockPrices, currentDay) => {
+const analyzeStockPricesWithGPT = async (
+	stockPrices,
+	currentDay,
+	modelName
+) => {
+	// Added modelName parameter
 	const prompt = `Analyze the following stock price data for trends and patterns, and make a concrete prediction for the next trading day. Clearly state whether stock prices are expected to rise or fall, and specify the expected percentage change or price range. Your prediction must be quantitative and actionable, enabling validation against actual market outcomes and also enabling fine-tuning. Consider historical trends, market behavior, and any notable anomalies in the data.
 
 Prediction:
@@ -42,11 +75,13 @@ Prediction:
 
 Reasoning: Provide a concise explanation for the prediction, including relevant factors such as market trends, sentiment shifts, historical data, and any anomalies observed.
 
+Make sure your response is within 1500 characters.
+
 The stock price data to analyze is: ${JSON.stringify(stockPrices)}`;
 
 	try {
 		const completion = await openai.chat.completions.create({
-			model: "gpt-4o",
+			model: modelName, // Use dynamic model name here
 			messages: [
 				{
 					role: "system",
@@ -130,9 +165,12 @@ const logGptcResults = async (position, day, prediction) => {
 };
 
 // Main GPTC function
-const gptc = async (position) => {
+const gptc = async (position, modelName) => {
+	// Accept modelName as parameter
 	try {
-		console.log(`Starting GPTC processing for position ${position}...`);
+		console.log(
+			`Starting GPTC processing for position ${position} using model ${modelName}...`
+		);
 
 		// Load the planner file and get the corresponding daily entry for the position
 		const plannerPath = path.resolve(
@@ -148,7 +186,11 @@ const gptc = async (position) => {
 
 		const day = entry.daily;
 		const stockPrices = await readStockPriceData(day);
-		const prediction = await analyzeStockPricesWithGPT(stockPrices, day);
+		const prediction = await analyzeStockPricesWithGPT(
+			stockPrices,
+			day,
+			modelName
+		); // Pass modelName to analyzeStockPricesWithGPT
 
 		await logGptcResults(position, day, prediction);
 

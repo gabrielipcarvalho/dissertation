@@ -59,35 +59,35 @@ def save_data(data, filename):
     print(f"Data saved to {filepath}")
 
 # Fetch and save daily data
-def fetch_and_save_daily(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
+def fetch_and_save_daily(symbol='SPY', start_date='2022-02-01', end_date='2022-06-10'):
     data = fetch_data('TIME_SERIES_DAILY', symbol, outputsize='full')
     print(f"Fetched daily data: {list(data.keys())}")  # Debug statement
     filtered_data = filter_data_by_date(data, start_date, end_date, 'Time Series (Daily)')
     print(f"Filtered data for range {start_date} to {end_date}: {json.dumps(filtered_data, indent=4)[:500]}")  # Debug statement
     save_data(filtered_data, f'daily_{symbol}.json')
 
-# Fetch and save weekly data
-def fetch_and_save_weekly(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
-    data = fetch_data('TIME_SERIES_WEEKLY', symbol, outputsize='full')
-    print(f"Fetched weekly data: {list(data.keys())}")  # Debug statement
-    filtered_data = filter_data_by_date(data, start_date, end_date, 'Weekly Time Series')
-    save_data(filtered_data, f'weekly_{symbol}.json')
+# # Fetch and save weekly data
+# def fetch_and_save_weekly(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
+#     data = fetch_data('TIME_SERIES_WEEKLY', symbol, outputsize='full')
+#     print(f"Fetched weekly data: {list(data.keys())}")  # Debug statement
+#     filtered_data = filter_data_by_date(data, start_date, end_date, 'Weekly Time Series')
+#     save_data(filtered_data, f'weekly_{symbol}.json')
 
-# Fetch and save monthly data
-def fetch_and_save_monthly(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
-    data = fetch_data('TIME_SERIES_MONTHLY', symbol, outputsize='full')
-    print(f"Fetched monthly data: {list(data.keys())}")  # Debug statement
-    filtered_data = filter_data_by_date(data, start_date, end_date, 'Monthly Time Series')
-    save_data(filtered_data, f'monthly_{symbol}.json')
+# # Fetch and save monthly data
+# def fetch_and_save_monthly(symbol='SPY', start_date='2022-05-30', end_date='2024-08-12'):
+#     data = fetch_data('TIME_SERIES_MONTHLY', symbol, outputsize='full')
+#     print(f"Fetched monthly data: {list(data.keys())}")  # Debug statement
+#     filtered_data = filter_data_by_date(data, start_date, end_date, 'Monthly Time Series')
+#     save_data(filtered_data, f'monthly_{symbol}.json')
 
 if __name__ == '__main__':
     symbol = 'SPY'  # S&P 500 ETF as a proxy
-    start_date = '2022-05-30'
-    end_date = '2024-08-12'
+    start_date = '2022-02-1'
+    end_date = '2022-06-10'
     try:
         fetch_and_save_daily(symbol, start_date, end_date)
-        fetch_and_save_weekly(symbol, start_date, end_date)
-        fetch_and_save_monthly(symbol, start_date, end_date)
+        # fetch_and_save_weekly(symbol, start_date, end_date)
+        # fetch_and_save_monthly(symbol, start_date, end_date)
         print("Data fetching completed successfully.")
     except ValueError as e:
         print(e)

@@ -2,7 +2,7 @@ import json
 import os
 
 # Path to the JSON file
-json_file_path = '../data/stock/daily_SPY.json'
+json_file_path = '../data/stock/reverse_daily_SPY.json'
 
 # Load the JSON data
 with open(json_file_path, 'r') as file:
